@@ -1,17 +1,6 @@
 import { useState } from 'react'
 
-// 背景画像のリスト（問題番号に応じてループして切り替える）
-const BG_IMAGES = [
-  '/images/bg1.jpg',
-  '/images/bg2.jpg',
-  '/images/bg3.jpg',
-  '/images/bg4.jpg',
-]
-
-// この問題数を超えたら背景を最後の画像で固定する
-const BG_LOOP_LIMIT = 12
-
-// 仮の問題データ（後でAPIから取得に変える）
+// ---- APIに差し替えるときはここを変える ----
 const QUESTIONS = [
   { id: 1, text: '日本の首都は？', choices: ['東京', '大阪'], correctAnswer: '東京' },
   { id: 2, text: '富士山の高さは3776mである', choices: ['◯', '✕'], correctAnswer: '◯' },
@@ -29,12 +18,6 @@ export function useGameState() {
 
   // 現在の問題オブジェクト
   const currentQuestion = QUESTIONS[questionIndex]
-
-  // 問題番号に応じた背景画像（BG_LOOP_LIMIT 以上は最後の画像で固定）
-  const currentBg =
-    questionIndex < BG_LOOP_LIMIT
-      ? BG_IMAGES[questionIndex % BG_IMAGES.length]
-      : BG_IMAGES[BG_IMAGES.length - 1]
 
   // ゲーム開始: 最初の問題に戻して回答をリセット
   function startGame() {
@@ -67,7 +50,6 @@ export function useGameState() {
   return {
     phase,
     currentQuestion,
-    currentBg,
     questionIndex,
     votes,
     startGame,
