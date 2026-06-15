@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 // ---- APIに差し替えるときはここを変える ----
 const QUESTIONS = [
@@ -20,20 +20,20 @@ export function useGameState() {
   const currentQuestion = QUESTIONS[questionIndex]
 
   // ゲーム開始: 最初の問題に戻して回答をリセット
-  function startGame() {
+  const startGame = useCallback(function startGame() {
     setQuestionIndex(0)
     setVotes({})
     setPhase('question')
-  }
+  }, [])
 
   // プレイヤーの回答を登録する
-  function submitVote(playerId, answer) {
+  const submitVote = useCallback(function submitVote(playerId, answer) {
     setVotes((prev) => ({ ...prev, [playerId]: answer }))
-  }
+  }, [])
 
   // 正解/不正解を受け取り次のフェーズへ進む
   // 不正解 → gameover、正解で最終問題 → result（クリア）、正解で続きあり → 次の question
-  function nextQuestion(isCorrect) {
+  const nextQuestion = useCallback(function nextQuestion(isCorrect) {
     if (!isCorrect) {
       setPhase('gameover')
       return
@@ -45,7 +45,7 @@ export function useGameState() {
     setVotes({})
     setQuestionIndex((prev) => prev + 1)
     setPhase('question')
-  }
+  }, [questionIndex])
 
   return {
     phase,

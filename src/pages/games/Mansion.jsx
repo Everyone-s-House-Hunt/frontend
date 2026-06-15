@@ -8,7 +8,7 @@ export function Mansion() {
   // マウント時に即スタート
   useEffect(() => {
     startGame()
-  }, [])
+  }, [startGame])
 
   function handleAnswer(isCorrect) {
     nextQuestion(isCorrect)
