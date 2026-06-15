@@ -17,6 +17,16 @@ body {
   filter: drop-shadow(6px 6px 0 #111);
 }
 
+.room-management-stage {
+  transform-origin: top center;
+}
+
+@media (min-width: 1024px) and (max-width: 1100px) {
+  .room-management-stage {
+    transform: scale(0.92);
+  }
+}
+
 @keyframes dissolve {
   from { opacity: 0; }
   to   { opacity: 1; }
