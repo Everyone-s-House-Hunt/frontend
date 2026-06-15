@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Mansion } from './pages/games/Mansion'
+import { Lobby } from './pages/Lobby'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Mansion />} />
+        <Route path="/" element={<Lobby />} />
       </Routes>
     </BrowserRouter>
   )
