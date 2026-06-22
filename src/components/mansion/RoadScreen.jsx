@@ -11,14 +11,16 @@ import { ChoicePanel } from './ChoicePanel'
 const ROAD_IMAGES = { 1: road1, 2: road2, 3: road3, 4: road4, 5: road5 }
 const FADE_DURATION = 700
 const STEP5_DURATION = 1500  // ステップ5を見せる時間
-const WRONG_DURATION = 2500  // wrong.jpegを見せる時間
 
 export function RoadScreen({ question, onAnswer }) {
   const [selectedChoice, setSelectedChoice] = useState(null)
   const [showWrong, setShowWrong] = useState(false)
 
   const onAnswerRef = useRef(onAnswer)
-  onAnswerRef.current = onAnswer
+
+  useEffect(() => {
+    onAnswerRef.current = onAnswer
+  }, [onAnswer])
 
   // タイムアウト: wrong.jpegを表示して停止
   function handleTimeout() {

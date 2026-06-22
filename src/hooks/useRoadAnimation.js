@@ -8,7 +8,10 @@ export function useRoadAnimation(onTimeout) {
   const [countdown, setCountdown] = useState(null)
   const doneRef = useRef(false)
   const onTimeoutRef = useRef(onTimeout)
-  onTimeoutRef.current = onTimeout
+
+  useEffect(() => {
+    onTimeoutRef.current = onTimeout
+  }, [onTimeout])
 
   // ステップ1〜3: 2秒ごとに次のステップへ進む
   useEffect(() => {
@@ -22,7 +25,10 @@ export function useRoadAnimation(onTimeout) {
   // ステップ4に到達したらカウントダウン開始
   useEffect(() => {
     if (roadStep !== 4) return
-    setCountdown(COUNTDOWN_SECONDS)
+    const t = setTimeout(() => {
+      setCountdown(COUNTDOWN_SECONDS)
+    }, 0)
+    return () => clearTimeout(t)
   }, [roadStep])
 
   // カウントダウン: 1秒ごとに減少、0になったらタイムアウト
