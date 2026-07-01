@@ -3,6 +3,7 @@ import { LobbyHome } from '../components/lobby/LobbyHome'
 import { JoinRoomModal } from '../components/lobby/JoinRoomModal'
 import { RoomManagement } from '../components/lobby/RoomManagement'
 import { Mansion } from './games/Mansion'
+import { WordPiece } from './games/WordPiece'
 import { createRoom, joinRoom, startRoomGame } from '../services/roomService'
 
 const INITIAL_SETTINGS = {
@@ -65,6 +66,9 @@ export function Lobby() {
   }
 
   if (view === 'game') {
+    if (settings.gameMode === 'wordPiece') {
+      return <WordPiece />
+    }
     return <Mansion />
   }
 
