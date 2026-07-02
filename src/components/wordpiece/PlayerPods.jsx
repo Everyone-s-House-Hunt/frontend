@@ -17,26 +17,44 @@ function PersonIcon() {
   )
 }
 
-export function PlayerPods() {
+// myPlayerIndex: 自分が担当しているプレイヤーの番号（0始まり）。
+// myAnswer: 自分が入力済みの1文字（未入力なら空文字）。
+// onMyBoxClick: 自分の回答ボックスをタップしたときに呼ばれる。
+export function PlayerPods({ myPlayerIndex, myAnswer = '', onMyBoxClick }) {
   return (
     <div className="flex w-full items-end justify-between gap-[2%] px-[3%]">
-      {PLAYERS.map((p) => (
-        <div key={p.label} className="flex min-w-0 flex-1 flex-col items-center">
-          <PersonIcon />
+      {PLAYERS.map((p, i) => {
+        const isMine = i === myPlayerIndex
 
-          <div
-            className={`relative -mt-1 w-full rounded-xl border-2 bg-gradient-to-b p-[1.2%] shadow-[0_6px_12px_rgba(0,0,0,0.5)] ${p.body} ${p.border}`}
-          >
+        return (
+          <div key={p.label} className="flex min-w-0 flex-1 flex-col items-center">
+            <PersonIcon />
+
             <div
-              className={`mb-[6%] rounded-md border border-white/40 bg-gradient-to-b py-1 text-center text-[min(1.6vw,1.25rem)] font-black text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.6)] ${p.tag}`}
+              className={`relative -mt-1 w-full rounded-xl border-2 bg-gradient-to-b p-[1.2%] shadow-[0_6px_12px_rgba(0,0,0,0.5)] ${p.body} ${p.border}`}
             >
-              {p.label}
-            </div>
+              <div
+                className={`mb-[6%] rounded-md border border-white/40 bg-gradient-to-b py-1 text-center text-[min(1.6vw,1.25rem)] font-black text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.6)] ${p.tag}`}
+              >
+                {p.label}
+              </div>
 
-            <div className="aspect-[4/3] w-full rounded-md border-2 border-white/70 bg-white shadow-inner" />
+              {isMine ? (
+                // 自分の担当ボックスだけタップで入力ポップアップを開ける
+                <button
+                  type="button"
+                  onClick={onMyBoxClick}
+                  className="flex aspect-[4/3] w-full cursor-pointer items-center justify-center rounded-md border-2 border-amber-300 bg-white text-[min(5vw,3.5rem)] font-black text-neutral-900 shadow-inner ring-2 ring-amber-300/60 hover:bg-amber-50"
+                >
+                  {myAnswer}
+                </button>
+              ) : (
+                <div className="aspect-[4/3] w-full rounded-md border-2 border-white/70 bg-white shadow-inner" />
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
