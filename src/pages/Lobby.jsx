@@ -64,6 +64,13 @@ export function Lobby() {
     }
   }
 
+  function handleBackToTitle() {
+    setError('')
+    setLoading(false)
+    setRoom(null)
+    setView('home')
+  }
+
   if (view === 'game') {
     return <Mansion />
   }
@@ -76,6 +83,7 @@ export function Lobby() {
           settings={settings}
           onSettingsChange={setSettings}
           onStartGame={handleStartGame}
+          onBackToTitle={handleBackToTitle}
           loading={loading}
           error={error}
         />

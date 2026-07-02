@@ -64,8 +64,8 @@ function MenuCard({ card, onCreateRoom, onOpenJoin, disabled }) {
 
 export function LobbyHome({ onCreateRoom, onOpenJoin, loading }) {
   return (
-    <main className="relative min-h-screen overflow-auto bg-[#170e3e]">
-      <div className="relative mx-auto min-h-[720px] w-full min-w-[1024px] max-w-[1440px] overflow-hidden">
+    <main className="relative h-screen min-h-[720px] overflow-hidden bg-[#170e3e]">
+      <div className="relative h-full min-h-[720px] w-full overflow-hidden">
         <img src={background} alt="" className="absolute inset-0 h-full w-full object-cover" />
 
         <img src={circleGreen} alt="" className="absolute left-[9%] top-[8%] size-[150px]" />
