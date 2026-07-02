@@ -1,21 +1,61 @@
+import { useEffect, useState } from 'react'
 import background from '../../assets/brain-survival-background.jpeg'
 import membersPanel from '../../assets/room-members-panel.png'
 import { RoomSettingsPanel } from './RoomSettingsPanel'
+
+const STAGE_WIDTH = 1062
+const STAGE_HEIGHT = 1024
+const STAGE_MARGIN = 32
+
+function calculateStageScale() {
+  if (typeof window === 'undefined') return 1
+
+  const viewport = window.visualViewport
+  const width = viewport?.width ?? window.innerWidth
+  const height = viewport?.height ?? window.innerHeight
+
+  return Math.min(
+    (width - STAGE_MARGIN) / STAGE_WIDTH,
+    (height - STAGE_MARGIN) / STAGE_HEIGHT,
+    1,
+  )
+}
 
 export function RoomManagement({
   room,
   settings,
   onSettingsChange,
   onStartGame,
+  onBackToTitle,
   loading,
   error,
 }) {
+  const [stageScale, setStageScale] = useState(calculateStageScale)
+
+  useEffect(() => {
+    function updateStageScale() {
+      setStageScale(calculateStageScale())
+    }
+
+    updateStageScale()
+    window.addEventListener('resize', updateStageScale)
+    window.visualViewport?.addEventListener('resize', updateStageScale)
+
+    return () => {
+      window.removeEventListener('resize', updateStageScale)
+      window.visualViewport?.removeEventListener('resize', updateStageScale)
+    }
+  }, [])
+
   return (
-    <main className="relative min-h-screen overflow-auto bg-[#170e3e]">
-      <div className="relative mx-auto min-h-[720px] w-full min-w-[1024px] max-w-[1440px] overflow-hidden">
+    <main className="relative h-screen min-h-[720px] overflow-hidden bg-[#170e3e]">
+      <div className="relative h-full min-h-[720px] w-full overflow-hidden">
         <img src={background} alt="" className="absolute inset-0 h-full w-full object-cover" />
 
-        <div className="room-management-stage relative z-10 mx-auto min-h-[1024px] w-[1062px] pt-20">
+        <div
+          className="room-management-stage absolute left-1/2 top-1/2 z-10 pt-20"
+          style={{ '--room-management-scale': stageScale }}
+        >
           <header className="text-center">
             <h1 className="text-[64px] font-black leading-[80px] text-black drop-shadow-[3px_3px_0_white]">
               ルーム管理
@@ -52,19 +92,30 @@ export function RoomManagement({
           </div>
 
           {error && (
-            <p className="absolute bottom-[98px] left-1/2 -translate-x-1/2 text-lg font-black text-red-700">
+            <p className="absolute bottom-[152px] left-1/2 -translate-x-1/2 text-lg font-black text-red-700">
               {error}
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={onStartGame}
-            disabled={loading}
-            className="absolute bottom-16 left-1/2 flex h-20 w-[300px] -translate-x-1/2 items-center justify-center whitespace-nowrap border-[3px] border-white bg-white/60 p-2 text-4xl font-black leading-[22px] text-black opacity-90 backdrop-blur-sm transition hover:bg-white/75 disabled:cursor-wait disabled:opacity-50"
-          >
-            {loading ? '開始中...' : 'ゲームスタート'}
-          </button>
+          <div className="absolute bottom-16 left-1/2 flex -translate-x-1/2 items-center justify-center gap-8">
+            <button
+              type="button"
+              onClick={onBackToTitle}
+              disabled={loading}
+              className="flex h-20 w-[300px] items-center justify-center whitespace-nowrap border-[4px] border-black bg-[#fff36d] p-2 text-3xl font-black leading-[22px] text-black shadow-[5px_5px_0_rgba(255,255,255,0.95)] transition hover:bg-[#ffe33d] disabled:cursor-wait disabled:opacity-50"
+            >
+              タイトルへ戻る
+            </button>
+
+            <button
+              type="button"
+              onClick={onStartGame}
+              disabled={loading}
+              className="flex h-20 w-[300px] items-center justify-center whitespace-nowrap border-[3px] border-white bg-white/70 p-2 text-4xl font-black leading-[22px] text-black opacity-95 backdrop-blur-sm transition hover:bg-white/85 disabled:cursor-wait disabled:opacity-50"
+            >
+              {loading ? '開始中...' : 'ゲームスタート'}
+            </button>
+          </div>
         </div>
       </div>
     </main>

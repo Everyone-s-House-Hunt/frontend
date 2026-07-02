@@ -18,13 +18,10 @@ body {
 }
 
 .room-management-stage {
-  transform-origin: top center;
-}
-
-@media (min-width: 1024px) and (max-width: 1100px) {
-  .room-management-stage {
-    transform: scale(0.92);
-  }
+  height: 1024px;
+  transform-origin: center;
+  transform: translate(-50%, -50%) scale(var(--room-management-scale, 1));
+  width: 1062px;
 }
 
 @keyframes dissolve {
