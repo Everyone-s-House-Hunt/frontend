@@ -1,11 +1,23 @@
+import { useState } from 'react'
 import background from '../../assets/kotobapiace_background.png'
 import { PlayerPods } from './PlayerPods'
+import { AnswerInputPopup } from './AnswerInputPopup'
 
 // コトバピースの画面本体（見た目担当）。
 // 上部に「問題」パネルを配置し、その中に問題文・回答マス・正解文字数を表示する。
-export function WordPieceScreen({ question }) {
+// myPlayerIndex: 自分が担当するプレイヤー番号（0始まり）。プレイヤー識別ができるまでは仮で0。
+export function WordPieceScreen({ question, myPlayerIndex = 0 }) {
   // 正解の文字数（回答マスの数）。今は正解文字列の長さから算出。
   const answerLength = question.correctAnswer.length
+
+  // 自分が入力した1文字と、入力ポップアップの開閉状態
+  const [myAnswer, setMyAnswer] = useState('')
+  const [isPopupOpen, setIsPopupOpen] = useState(false)
+
+  const handleSubmit = (char) => {
+    setMyAnswer(char)
+    setIsPopupOpen(false)
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-hidden text-white">
@@ -39,8 +51,21 @@ export function WordPieceScreen({ question }) {
 
       {/* 画面下部の5人のプレイヤー台 */}
       <div className="relative z-10 mt-auto w-full pb-6">
-        <PlayerPods />
+        <PlayerPods
+          myPlayerIndex={myPlayerIndex}
+          myAnswer={myAnswer}
+          onMyBoxClick={() => setIsPopupOpen(true)}
+        />
       </div>
+
+      {/* 自分の1文字を入力するポップアップ（今はキーボード、将来は手書きに差し替え） */}
+      {isPopupOpen && (
+        <AnswerInputPopup
+          initialValue={myAnswer}
+          onSubmit={handleSubmit}
+          onClose={() => setIsPopupOpen(false)}
+        />
+      )}
     </div>
   )
 }
