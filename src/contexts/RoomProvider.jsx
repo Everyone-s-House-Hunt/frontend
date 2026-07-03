@@ -32,10 +32,13 @@ function generateRoomId() {
 }
 
 // players（バックエンドの PlayerInfo 配列）から表示用の情報を作る。
-// バックエンドの一覧は順序が不定なので、ホスト先頭 + ID順で安定させる。
+// バックエンドの一覧は順序が不定なので、ホスト先頭 + 参加順（join_seq）で安定させる。
 function derivePlayers(players) {
   const sorted = [...players].sort(
-    (a, b) => Number(b.is_host) - Number(a.is_host) || a.player_id.localeCompare(b.player_id),
+    (a, b) =>
+      Number(b.is_host) - Number(a.is_host) ||
+      (a.join_seq ?? 0) - (b.join_seq ?? 0) ||
+      a.player_id.localeCompare(b.player_id),
   )
   const named = sorted.filter((p) => p.nickname) // room:join 前の接続者は名前が空なので表示から除く
   return {
@@ -78,10 +81,11 @@ export function RoomProvider({ children }) {
   }, [])
 
   // 接続〜入室の共通処理。成功したら room:joined の payload を返す。
+  // create: true はルーム作成（ホスト）、無しは既存ルームへの参加のみ。
   const connectAndJoin = useCallback(
-    async ({ roomId, nickname }) => {
+    async ({ roomId, nickname, create = false }) => {
       setServerError('')
-      const joined = await getConnection().join({ roomId, nickname })
+      const joined = await getConnection().join({ roomId, nickname, create })
       setActiveGame(null)
       setRoom({
         roomId,
@@ -96,9 +100,16 @@ export function RoomProvider({ children }) {
 
   const createRoom = useCallback(
     async ({ userName }) => {
-      const roomId = generateRoomId()
-      await connectAndJoin({ roomId, nickname: userName || 'ホスト' })
-      return roomId
+      // 6桁IDはフロント生成なので稀に既存ルームと衝突する。その時だけ振り直して再試行する。
+      for (let attempt = 0; ; attempt++) {
+        const roomId = generateRoomId()
+        try {
+          await connectAndJoin({ roomId, nickname: userName || 'ホスト', create: true })
+          return roomId
+        } catch (err) {
+          if (attempt >= 2 || err?.message !== 'room already exists') throw err
+        }
+      }
     },
     [connectAndJoin],
   )
