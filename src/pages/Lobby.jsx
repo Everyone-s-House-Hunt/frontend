@@ -7,7 +7,7 @@ import { useRoom } from '../hooks/useRoom'
 // ロビーホーム（/）。ルーム作成・コード入力での参加ができ、成功したら /room/:roomId へ遷移する。
 export function Lobby() {
   const navigate = useNavigate()
-  const { createRoom, joinRoom } = useRoom()
+  const { createRoom, joinByInvite } = useRoom()
   const [isJoinOpen, setIsJoinOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -18,8 +18,12 @@ export function Lobby() {
     try {
       const roomId = await action()
       navigate(`/room/${roomId}`)
-    } catch {
-      setError('ルームに接続できませんでした')
+    } catch (err) {
+      setError(
+        err?.message === 'room not found'
+          ? 'ルームが見つかりません。ルームIDを確認してください'
+          : 'ルームに接続できませんでした',
+      )
     } finally {
       setLoading(false)
     }
@@ -29,8 +33,10 @@ export function Lobby() {
     runRoomAction(() => createRoom({ userName: 'ホスト' }))
   }
 
-  function handleJoinRoom(payload) {
-    runRoomAction(() => joinRoom(payload))
+  // 参加ポップアップの入力はルームIDのみ。ニックネームは「メンバーN」を自動採番する
+  // joinByInvite に乗せる（モック: 今は招待トークン＝ルームID）。
+  function handleJoinRoom({ roomId }) {
+    runRoomAction(() => joinByInvite({ inviteToken: roomId }))
   }
 
   return (
