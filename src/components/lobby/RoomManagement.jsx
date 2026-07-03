@@ -52,6 +52,35 @@ function InviteUrl() {
   // )
 }
 
+// ルームIDの表示と招待URLのコピー。ボタンは「クリックだけで参加できるURL」をコピーする。
+// モック: 今は招待トークン＝ルームID。将来はバックエンドが発行する招待トークンに差し替える。
+function RoomIdLine({ roomId }) {
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/join/${roomId}`)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // コピー失敗時は何もしない（IDは表示されているので口頭やルーム参加ポップアップで共有できる）
+    }
+  }
+
+  return (
+    <p className="flex items-center justify-center gap-3 text-xl font-black leading-[22px] text-white">
+      <span>ルームID ：{roomId}</span>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="border-2 border-white bg-white/60 px-3 py-0.5 text-sm text-black transition hover:bg-white/75"
+      >
+        {copied ? 'コピーしました！' : '招待URLをコピー'}
+      </button>
+    </p>
+  )
+}
+
 // メンバー1行分。「ラベル：名前」で表示し、自分の行だけ名前をクリックすると編集できる。
 function MemberRow({ label, name, isSelf, onRename, className = '' }) {
   const [editing, setEditing] = useState(false)
@@ -136,12 +165,10 @@ export function RoomManagement({
           style={{ '--room-management-scale': stageScale }}
         >
           <header className="text-center">
-            <h1 className="text-[64px] font-black leading-[80px] text-black drop-shadow-[3px_3px_0_white]">
+            <h1 className="heading-outline text-[64px] font-black leading-[80px] text-black">
               ルーム管理
             </h1>
-            <p className="text-xl font-black leading-[22px] text-white">
-              ルームID ：{room.roomId}
-            </p>
+            <RoomIdLine roomId={room.roomId} />
             <InviteUrl roomId={room.roomId} />
           </header>
 
@@ -150,7 +177,7 @@ export function RoomManagement({
                 画像だけ上に伸ばして表示し（下端は不変）、視覚上の上端を右カラムと揃える。 */}
             <section className="relative h-[713px] w-[495px] shrink-0" aria-label="参加状況">
               <img src={membersPanel} alt="" className="absolute -top-[59px] left-0 h-[778px] w-full object-fill" />
-              <h2 className="absolute inset-x-0 top-[65px] text-center text-[32px] font-black leading-10 text-black">
+              <h2 className="heading-outline-sm absolute inset-x-0 top-[65px] text-center text-[32px] font-black leading-10 text-black">
                 メンバー
               </h2>
               {/* ホストはこの行のみに表示。自分がホストならここで名前を変更できる */}
@@ -204,7 +231,7 @@ export function RoomManagement({
               disabled={loading}
               className="flex h-20 w-[300px] items-center justify-center whitespace-nowrap border-[3px] border-white bg-white/70 p-2 text-4xl font-black leading-[22px] text-black opacity-95 backdrop-blur-sm transition hover:bg-white/85 disabled:cursor-wait disabled:opacity-50"
             >
-              {loading ? '開始中...' : 'ゲームスタート'}
+              <span className="heading-outline-sm">{loading ? '開始中...' : 'ゲームスタート'}</span>
             </button>
           </div>
         </div>
