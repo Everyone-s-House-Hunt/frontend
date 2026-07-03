@@ -13,15 +13,17 @@ export class RoomConnection {
   }
 
   // 接続して room:join まで行い、room:joined の payload を resolve で返す。
+  // create: true はルーム作成（ホスト）。無しは既存ルームへの参加のみで、
+  // 存在しないIDだとサーバーが "room not found" を返して接続を閉じる。
   // React StrictMode の effect 二重実行で二重接続しないよう、
   // 同じルームへ join 中／済みなら同じ Promise を返す。
-  join({ roomId, nickname }) {
+  join({ roomId, nickname, create = false }) {
     if (this.current?.roomId === roomId) {
       return this.current.promise
     }
     this.close()
 
-    const ws = new WebSocket(`${WS_BASE_URL}/ws/rooms/${roomId}`)
+    const ws = new WebSocket(`${WS_BASE_URL}/ws/rooms/${roomId}${create ? '?create=1' : ''}`)
     const entry = { roomId, ws, joined: false, reject: null }
 
     entry.promise = new Promise((resolve, reject) => {
@@ -103,7 +105,15 @@ export class RoomConnection {
         this.handlers.onDestroyed?.(payload.reason)
         break
       case type === 'error':
-        this.handlers.onServerError?.(payload.message)
+        if (!entry.joined) {
+          // 入室前のエラー（room not found など）は join の失敗として理由つきで返す
+          if (this.current === entry) this.current = null
+          entry.ws.onclose = null
+          entry.ws.close()
+          entry.reject?.(new Error(payload.message))
+        } else {
+          this.handlers.onServerError?.(payload.message)
+        }
         break
       case type.startsWith('game:'):
         this.handlers.onGameMessage?.(type, payload)
