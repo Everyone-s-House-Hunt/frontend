@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useRoom } from '../hooks/useRoom'
 
+// サーバーの拒否理由 → ユーザー向けメッセージ
+const JOIN_ERROR_MESSAGES = {
+  'game already in progress': 'このルームはゲーム中のため参加できません。',
+  'room is full': 'ルームが満室です。',
+}
+
 // 招待URL（/join/:inviteToken）の着地点。「URLクリックだけで参加」を実現するページ。
 // ゲスト名を自動発行してWSでルームに参加し、成功したらルーム管理へ移動する。
 export function JoinByInvite() {
@@ -20,9 +26,8 @@ export function JoinByInvite() {
       .catch((err) => {
         if (!cancelled) {
           setError(
-            err?.message === 'game already in progress'
-              ? 'このルームはゲーム中のため参加できません。'
-              : 'ルームに参加できませんでした。招待URLを確認してください。',
+            JOIN_ERROR_MESSAGES[err?.message] ??
+              'ルームに参加できませんでした。招待URLを確認してください。',
           )
         }
       })
