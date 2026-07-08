@@ -62,7 +62,7 @@ function MenuCard({ card, onCreateRoom, onOpenJoin, disabled }) {
   )
 }
 
-export function LobbyHome({ onCreateRoom, onOpenJoin, loading }) {
+export function LobbyHome({ onCreateRoom, onOpenJoin, loading, error, notice }) {
   return (
     <main className="relative h-screen min-h-[720px] overflow-hidden bg-[#170e3e]">
       <div className="relative h-full min-h-[720px] w-full overflow-hidden">
@@ -76,13 +76,13 @@ export function LobbyHome({ onCreateRoom, onOpenJoin, loading }) {
         <div className="relative z-10 flex min-h-screen flex-col items-center px-10 pb-[10vh] pt-[11vh]">
           <div className="text-center">
             <h1 className="lobby-title text-[clamp(76px,8.4vw,128px)] font-black leading-[0.78] text-black">
-              <span className="block -rotate-6">ブレイン</span>
+              <span className="block -translate-x-32 -rotate-6">ブレイン</span>
               <span className="block translate-x-32">サバイバル</span>
             </h1>
             <p className="mx-auto mt-12 max-w-[920px] text-center text-2xl font-black leading-[30px] text-white drop-shadow-[3px_3px_0_rgba(0,0,0,0.75)]">
-              このサイトで何ができるか、どんな時に何を目的で使うかの説明文
+              友達とブラウザで遊べるリアルタイム協力クイズ！
               <br />
-              文章ぶんしょう、説明せつめい、gameゲーム,長文ちょうぶん、ブレインサバイバル
+              みんなで知識を持ち寄って正解を繋げ、全ステージ生き残りを目指せ！
             </p>
           </div>
 
@@ -97,6 +97,17 @@ export function LobbyHome({ onCreateRoom, onOpenJoin, loading }) {
               />
             ))}
           </div>
+
+          {error ? (
+            <p className="mt-6 text-center text-xl font-black text-red-400 drop-shadow-[2px_2px_0_rgba(0,0,0,0.75)]">
+              {error}
+            </p>
+          ) : notice ? (
+            // ルーム解散の通知。エラーではないので黄色で表示する
+            <p className="mt-6 text-center text-xl font-black text-yellow-300 drop-shadow-[2px_2px_0_rgba(0,0,0,0.75)]">
+              {notice}
+            </p>
+          ) : null}
         </div>
       </div>
     </main>

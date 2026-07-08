@@ -1,31 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { LobbyHome } from '../components/lobby/LobbyHome'
 import { JoinRoomModal } from '../components/lobby/JoinRoomModal'
-import { RoomManagement } from '../components/lobby/RoomManagement'
-import { Mansion } from './games/Mansion'
-import { createRoom, joinRoom, startRoomGame } from '../services/roomService'
+import { useRoom } from '../hooks/useRoom'
 
-const INITIAL_SETTINGS = {
-  gameMode: 'zombieBullet',
-  questionSource: 'random',
+// サーバーの拒否理由 → ユーザー向けメッセージ
+const JOIN_ERROR_MESSAGES = {
+  'room not found': 'ルームが見つかりません。ルームIDを確認してください',
+  'game already in progress': 'このルームはゲーム中のため参加できません',
+  'room is full': 'ルームが満室です',
 }
 
+// ロビーホーム（/）。ルーム作成・コード入力での参加ができ、成功したら /room/:roomId へ遷移する。
 export function Lobby() {
-  const [view, setView] = useState('home')
-  const [room, setRoom] = useState(null)
-  const [settings, setSettings] = useState(INITIAL_SETTINGS)
+  const navigate = useNavigate()
+  const { createRoom, joinByInvite, room, leaveRoom, roomNotice } = useRoom()
+  const [isJoinOpen, setIsJoinOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // ブラウザバック等で「ルームに接続したまま」ロビーへ戻った場合は切断する。
+  // 残したままだと他メンバーには在室中に見え、次のルーム作成・参加時に
+  // 旧接続が黙って閉じられて旧ルームが破棄（全員追い出し）されてしまう。
+  // マウント時に残っていた接続だけが対象（ルーム作成直後の room 変化で
+  // 新しい接続を切らないよう、room の変化には反応させない）。
+  const cleanedUpStaleRoom = useRef(false)
+  useEffect(() => {
+    if (cleanedUpStaleRoom.current) return
+    cleanedUpStaleRoom.current = true
+    if (room) leaveRoom()
+  }, [room, leaveRoom])
 
   async function runRoomAction(action) {
     setLoading(true)
     setError('')
     try {
-      const nextRoom = await action()
-      setRoom(nextRoom)
-      setView('roomManagement')
-    } catch {
-      setError('ルーム情報の取得に失敗しました')
+      const roomId = await action()
+      navigate(`/room/${roomId}`)
+    } catch (err) {
+      setError(JOIN_ERROR_MESSAGES[err?.message] ?? 'ルームに接続できませんでした')
     } finally {
       setLoading(false)
     }
@@ -35,73 +48,29 @@ export function Lobby() {
     runRoomAction(() => createRoom({ userName: 'ホスト' }))
   }
 
-  function handleJoinRoom(payload) {
-    runRoomAction(() => joinRoom(payload))
-  }
-
-  async function handleStartGame() {
-    if (!room) return
-
-    setLoading(true)
-    setError('')
-    try {
-      const result = await startRoomGame({
-        roomId: room.roomId,
-        gameMode: settings.gameMode,
-        questionSource: settings.questionSource,
-      })
-
-      if (!result.ok) {
-        setError('ゲームを開始できませんでした')
-        return
-      }
-
-      setView('game')
-    } catch {
-      setError('ゲームを開始できませんでした')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function handleBackToTitle() {
-    setError('')
-    setLoading(false)
-    setRoom(null)
-    setView('home')
-  }
-
-  if (view === 'game') {
-    return <Mansion />
+  // 参加ポップアップの入力はルームIDのみ。ニックネームは「メンバーN」を自動採番する
+  // joinByInvite に乗せる（モック: 今は招待トークン＝ルームID）。
+  function handleJoinRoom({ roomId }) {
+    runRoomAction(() => joinByInvite({ inviteToken: roomId }))
   }
 
   return (
     <>
-      {view === 'roomManagement' && room ? (
-        <RoomManagement
-          room={room}
-          settings={settings}
-          onSettingsChange={setSettings}
-          onStartGame={handleStartGame}
-          onBackToTitle={handleBackToTitle}
-          loading={loading}
-          error={error}
-        />
-      ) : (
-        <LobbyHome
-          onCreateRoom={handleCreateRoom}
-          onOpenJoin={() => {
-            setError('')
-            setView('joinRoom')
-          }}
-          loading={loading}
-        />
-      )}
+      <LobbyHome
+        onCreateRoom={handleCreateRoom}
+        onOpenJoin={() => {
+          setError('')
+          setIsJoinOpen(true)
+        }}
+        loading={loading}
+        error={isJoinOpen ? '' : error}
+        notice={roomNotice}
+      />
 
-      {view === 'joinRoom' && (
+      {isJoinOpen && (
         <JoinRoomModal
           onClose={() => {
-            if (!loading) setView('home')
+            if (!loading) setIsJoinOpen(false)
           }}
           onSubmit={handleJoinRoom}
           loading={loading}

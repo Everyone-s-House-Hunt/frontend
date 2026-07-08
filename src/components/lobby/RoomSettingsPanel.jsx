@@ -59,10 +59,10 @@ export function RoomSettingsPanel({ value, onChange }) {
           alt=""
           className="absolute inset-0 h-full w-full object-fill"
         />
-        <div className="absolute inset-x-0 top-[70px] text-center text-[32px] font-black leading-10 text-black drop-shadow-[3px_3px_0_white]">
+        <div className="heading-outline-sm absolute inset-x-0 top-[66px] text-center text-[32px] font-black leading-10 text-black">
           ゲームモード
         </div>
-        <div className="absolute left-1/2 top-[150px] w-[396px] -translate-x-1/2">
+        <div className="absolute left-1/2 top-[132px] w-[383px] -translate-x-1/2">
           <OptionGrid
             items={GAME_MODES}
             selectedValue={value.gameMode}
@@ -77,8 +77,8 @@ export function RoomSettingsPanel({ value, onChange }) {
           alt=""
           className="absolute inset-0 h-full w-full object-fill"
         />
-        <div className="absolute inset-x-0 top-[66px] text-center text-[32px] font-black leading-10 text-black drop-shadow-[3px_3px_0_white]">
-          もんだい
+        <div className="heading-outline-sm absolute inset-x-0 top-[66px] text-center text-[32px] font-black leading-10 text-black">
+          問題
         </div>
         <div className="absolute left-1/2 top-[132px] w-[383px] -translate-x-1/2">
           <OptionGrid
