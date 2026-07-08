@@ -17,8 +17,14 @@ export function JoinByInvite() {
       .then((roomId) => {
         if (!cancelled) navigate(`/room/${roomId}`, { replace: true })
       })
-      .catch(() => {
-        if (!cancelled) setError('ルームに参加できませんでした。招待URLを確認してください。')
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err?.message === 'game already in progress'
+              ? 'このルームはゲーム中のため参加できません。'
+              : 'ルームに参加できませんでした。招待URLを確認してください。',
+          )
+        }
       })
 
     return () => {
