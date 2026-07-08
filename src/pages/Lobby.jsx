@@ -8,6 +8,7 @@ import { useRoom } from '../hooks/useRoom'
 const JOIN_ERROR_MESSAGES = {
   'room not found': 'ルームが見つかりません。ルームIDを確認してください',
   'game already in progress': 'このルームはゲーム中のため参加できません',
+  'room is full': 'ルームが満室です',
 }
 
 // ロビーホーム（/）。ルーム作成・コード入力での参加ができ、成功したら /room/:roomId へ遷移する。
