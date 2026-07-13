@@ -56,8 +56,9 @@ export class RoomConnection {
   // ゲーム中メッセージの送信にも使う汎用送信
   send(type, payload) {
     const ws = this.current?.ws
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
     this.#send(ws, type, payload)
+    return true
   }
 
   sendGameStart(gameMode) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoomContext } from './roomContext'
 import { RoomConnection } from '../services/wsRoomClient'
+import { replayGameEvents } from './gameEventHistory'
 
 // ルーム情報・ゲーム設定・WS接続を、ルート（画面）をまたいで共有するProvider。
 const INITIAL_SETTINGS = {
@@ -69,6 +70,14 @@ export function RoomProvider({ children }) {
   const [roomNotice, setRoomNotice] = useState('') // ルーム解散の通知（ロビーで表示）
   const connectionRef = useRef(null)
   const gameSubscribersRef = useRef(new Set())
+  const gameHistoryRef = useRef([])
+  const gameSequenceRef = useRef(0)
+
+  const clearGameSession = useCallback(() => {
+    gameHistoryRef.current = []
+    gameSequenceRef.current = 0
+    setActiveGame(null)
+  }, [])
 
   // onDestroyed（接続時に一度だけ作るハンドラ）から最新のルーム情報を参照するための ref
   const roomRef = useRef(null)
@@ -87,20 +96,35 @@ export function RoomProvider({ children }) {
           // 「突然タイトルに戻された」ように見えないよう、理由をロビーに表示する。
           setRoomNotice(buildDestroyedNotice(roomRef.current, reason, disconnectedPlayerId))
           setRoom(null)
-          setActiveGame(null)
+          clearGameSession()
         },
         onServerError: (message) => setServerError(message),
         onGameMessage: (type, payload) => {
           const mode = GAME_START_TO_MODE[type]
-          if (mode) {
-            setActiveGame((prev) => prev ?? { mode, startType: type, startPayload: payload })
+          const event = {
+            type,
+            payload,
+            receivedAt: Date.now(),
+            sequence: gameSequenceRef.current + 1,
           }
-          gameSubscribersRef.current.forEach((cb) => cb(type, payload))
+          gameSequenceRef.current = event.sequence
+
+          if (mode && gameHistoryRef.current.length === 0) {
+            setActiveGame({
+              mode,
+              startType: type,
+              startPayload: payload,
+              startedAt: event.receivedAt,
+            })
+          }
+          gameHistoryRef.current.push(event)
+          if (gameHistoryRef.current.length > 200) gameHistoryRef.current.shift()
+          gameSubscribersRef.current.forEach((cb) => cb(type, payload, event))
         },
       })
     }
     return connectionRef.current
-  }, [])
+  }, [clearGameSession])
 
   // 接続〜入室の共通処理。成功したら room:joined の payload を返す。
   // create: true はルーム作成（ホスト）、無しは既存ルームへの参加のみ。
@@ -109,7 +133,7 @@ export function RoomProvider({ children }) {
       setServerError('')
       setRoomNotice('') // 新しいルームに入るので前回の解散通知は消す
       const joined = await getConnection().join({ roomId, nickname, create })
-      setActiveGame(null)
+      clearGameSession()
       setRoom({
         roomId,
         playerId: joined.player_id,
@@ -118,7 +142,7 @@ export function RoomProvider({ children }) {
       })
       return joined
     },
-    [getConnection],
+    [clearGameSession, getConnection],
   )
 
   const createRoom = useCallback(
@@ -179,17 +203,23 @@ export function RoomProvider({ children }) {
   const leaveRoom = useCallback(() => {
     getConnection().close()
     setRoom(null)
-    setActiveGame(null)
-  }, [getConnection])
+    clearGameSession()
+  }, [clearGameSession, getConnection])
 
-  // ゲーム画面がゲーム中メッセージを購読するためのAPI（戻り値は購読解除関数）
-  const subscribeGame = useCallback((callback) => {
+  // replay=true なら画面遷移前に届いたイベントも受信順で即時再生する。
+  const subscribeGame = useCallback((callback, { replay = false } = {}) => {
     gameSubscribersRef.current.add(callback)
+    if (replay) {
+      replayGameEvents(gameHistoryRef.current, callback)
+    }
     return () => gameSubscribersRef.current.delete(callback)
   }, [])
 
   const sendGameMessage = useCallback(
-    (type, payload) => getConnection().send(type, payload),
+    (type, payload) => {
+      setServerError('')
+      return getConnection().send(type, payload)
+    },
     [getConnection],
   )
 
