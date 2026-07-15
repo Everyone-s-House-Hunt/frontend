@@ -11,7 +11,7 @@ const INITIAL_SETTINGS = {
 // フロントの gameMode 値 → バックエンドの game_mode 値
 const BACKEND_GAME_MODE = {
   zombieBullet: 'bullet',
-  wordPiece: 'piace',
+  wordPiece: 'piece',
   fiveTours: 'order',
   boarPanic: 'panic',
 }
@@ -21,7 +21,7 @@ const BACKEND_GAME_MODE = {
 // これを受け取ったら全員をゲーム画面へ遷移させる。
 const GAME_START_TO_MODE = {
   'game:bullet_start': 'zombieBullet',
-  'game:piace_round_start': 'wordPiece',
+  'game:piece_round_start': 'wordPiece',
   'game:turn_start': 'fiveTours',
   'game:round_start': 'boarPanic',
 }
@@ -159,6 +159,9 @@ export function RoomProvider({ children }) {
     setActiveGame(null)
   }, [getConnection])
 
+  // ゲーム終了後にルーム画面へ戻る（接続は維持したままゲーム状態だけ消す）
+  const clearActiveGame = useCallback(() => setActiveGame(null), [])
+
   // ゲーム画面がゲーム中メッセージを購読するためのAPI（戻り値は購読解除関数）
   const subscribeGame = useCallback((callback) => {
     gameSubscribersRef.current.add(callback)
@@ -184,6 +187,7 @@ export function RoomProvider({ children }) {
         renameSelf,
         startGame,
         leaveRoom,
+        clearActiveGame,
         subscribeGame,
         sendGameMessage,
       }}
