@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import background from '../../assets/kotobapiace_background.png'
+import background from '../../assets/kotobapiece_background.png'
 import { PlayerPods } from './PlayerPods'
 import { AnswerInputPopup } from './AnswerInputPopup'
 

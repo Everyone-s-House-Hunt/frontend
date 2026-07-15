@@ -11,7 +11,7 @@ const INITIAL_SETTINGS = {
 // フロントの gameMode 値 → バックエンドの game_mode 値
 const BACKEND_GAME_MODE = {
   zombieBullet: 'bullet',
-  wordPiece: 'piace',
+  wordPiece: 'piece',
   fiveTours: 'order',
   boarPanic: 'panic',
 }
@@ -21,7 +21,7 @@ const BACKEND_GAME_MODE = {
 // これを受け取ったら全員をゲーム画面へ遷移させる。
 const GAME_START_TO_MODE = {
   'game:bullet_start': 'zombieBullet',
-  'game:piace_round_start': 'wordPiece',
+  'game:piece_round_start': 'wordPiece',
   'game:turn_start': 'fiveTours',
   'game:round_start': 'boarPanic',
 }

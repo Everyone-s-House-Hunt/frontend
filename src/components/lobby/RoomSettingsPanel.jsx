@@ -4,7 +4,7 @@ import questionSourcePanel from '../../assets/question-source-panel.png'
 const GAME_MODES = [
   { value: 'zombieBullet', label: 'ゾンビバレット' },
   { value: 'wordPiece', label: 'コトバピース' },
-  { value: 'fiveTours', label: 'ファイブツアーズ' },
+  { value: 'fiveTours', label: 'モジオーダー' },
   { value: 'boarPanic', label: 'イノシシパニック' },
 ]
 
