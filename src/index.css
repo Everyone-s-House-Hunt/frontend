@@ -1,5 +1,44 @@
 @import "tailwindcss";
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Dela Gothic One", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  /* Dela Gothic One は 400 のみ。font-black への疑似ボールドで文字が潰れるのを防ぐ */
+  font-synthesis: none;
+}
+
+.lobby-title {
+  -webkit-text-stroke: 8px #fff;
+  paint-order: stroke fill;
+  filter: drop-shadow(6px 6px 0 #111);
+}
+
+/* ロビー内見出し（ルーム管理・メンバー等）用。lobby-title と同じ白フチ＋影を文字サイズに合わせて縮小 */
+.heading-outline {
+  -webkit-text-stroke: 5px #fff;
+  paint-order: stroke fill;
+  filter: drop-shadow(4px 4px 0 #111);
+}
+
+.heading-outline-sm {
+  -webkit-text-stroke: 4px #fff;
+  paint-order: stroke fill;
+  filter: drop-shadow(3px 3px 0 #111);
+}
+
+.room-management-stage {
+  height: 1024px;
+  transform-origin: center;
+  transform: translate(-50%, -50%) scale(var(--room-management-scale, 1));
+  width: 1062px;
+}
+
 @keyframes dissolve {
   from { opacity: 0; }
   to   { opacity: 1; }

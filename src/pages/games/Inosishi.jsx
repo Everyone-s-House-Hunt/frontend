@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { usePanicSocket } from '../../hooks/usePanicSocket'
+import { useNavigate } from 'react-router-dom'
+import { useRoom } from '../../hooks/useRoom'
+import { usePanicGame } from '../../hooks/usePanicGame'
 import { useVideoSequence } from '../../hooks/useVideoSequence'
-import { LoadingScreen } from '../../components/inosishi/LoadingScreen'
-import { RoomEntry } from '../../components/inosishi/RoomEntry'
-import { RoomLobby } from '../../components/inosishi/RoomLobby'
 import { VideoStage } from '../../components/inosishi/VideoStage'
 import { ChoicePlates } from '../../components/inosishi/ChoicePlates'
 import { GameOverScreen } from '../../components/inosishi/GameOverScreen'
@@ -16,18 +15,22 @@ const CLIPS = {
   wrong: '/videos/floor-wrong.mp4',
 }
 
-// ラウンド結果を見せる時間（プレート上の人数バッジ表示）
+// ラウンド結果（得票数バッジ）を見せる時間
 const REVEAL_MS = 1500
 
+// イノシシパニック本体。ルーム入室〜ゲーム開始はロビー側（RoomProvider）が済ませていて、
+// この画面は /room/:roomId/game で activeGame.mode === 'boarPanic' のときに表示される。
 export function Inosishi() {
-  const [isLoading, setIsLoading] = useState(true)
+  const navigate = useNavigate()
+  const { room, clearActiveGame } = useRoom()
+  const game = usePanicGame()
+
   // 動画ステージ:
-  // 'idle'(初回round待ち) | 'approach'(出題+投票) | 'awaitResult'(動画終了・結果待ち)
+  // 'idle'(round待ち) | 'approach'(出題+投票) | 'awaitResult'(動画終了・結果待ち)
   // | 'reveal'(得票数表示) | 'door' | 'wrong' | 'awaitRound'(次ラウンド待ち) | 'over' | 'complete'
   const [stage, setStage] = useState('idle')
   const lastPlayedRoundRef = useRef(0)
 
-  const sock = usePanicSocket()
   const { src, token, visible, fadeMs, transitionTo, handleReady } = useVideoSequence(CLIPS.approach)
 
   // 全クリップを先読みして切り替え時のカクつきを防ぐ
@@ -41,35 +44,35 @@ export function Inosishi() {
 
   // ラウンド開始: 初回は即approach、2問目以降はdoor再生終了(awaitRound)と揃ったら
   useEffect(() => {
-    if (!sock.round) return
-    if (sock.round.round === lastPlayedRoundRef.current) return
+    if (!game.round) return
+    if (game.round.round === lastPlayedRoundRef.current) return
     if (stage === 'idle') {
-      lastPlayedRoundRef.current = sock.round.round
+      lastPlayedRoundRef.current = game.round.round
       setStage('approach')
       return
     }
     if (stage === 'awaitRound') {
-      lastPlayedRoundRef.current = sock.round.round
+      lastPlayedRoundRef.current = game.round.round
       setStage('approach')
       transitionTo(CLIPS.approach)
     }
-  }, [sock.round, stage, transitionTo])
+  }, [game.round, stage, transitionTo])
 
   // approach動画が終わって結果が届いたら得票数を見せる
   useEffect(() => {
-    if (stage === 'awaitResult' && sock.roundResult) {
+    if (stage === 'awaitResult' && game.roundResult) {
       setStage('reveal')
     }
-  }, [stage, sock.roundResult])
+  }, [stage, game.roundResult])
 
   // 得票数を1.5秒見せてから扉/床抜けへ
   useEffect(() => {
     if (stage !== 'reveal') return
     const t = setTimeout(() => {
-      const result = sock.roundResult
+      const result = game.roundResult
       const counts = [
-        (result.votes && result.votes['0'] ? result.votes['0'].length : 0),
-        (result.votes && result.votes['1'] ? result.votes['1'].length : 0),
+        result.votes && result.votes['0'] ? result.votes['0'].length : 0,
+        result.votes && result.votes['1'] ? result.votes['1'].length : 0,
       ]
       if (result.result === 'tie') {
         // 同票（0対0含む）は扉を開けずにそのまま床抜け
@@ -87,10 +90,42 @@ export function Inosishi() {
 
   // 最終問題クリア: door再生が先に終わっていてgame:clearが後から届いた場合
   useEffect(() => {
-    if (stage === 'awaitRound' && sock.gameClear) {
+    if (stage === 'awaitRound' && game.gameClear) {
       setStage('complete')
     }
-  }, [stage, sock.gameClear])
+  }, [stage, game.gameClear])
+
+  // 裏タブ対策: ブラウザは裏タブの動画・タイマーを止めるため、動画のended頼みの
+  // 進行は裏で止まる。ゲームの正はサーバー状態なので、表に戻った瞬間に
+  // 「本来いるべきステージ」まで一気に追いつく（途中の演出はスキップ）
+  useEffect(() => {
+    function resync() {
+      if (document.visibilityState !== 'visible') return
+      // 終了系が届いていたら最優先でそこへ
+      if (game.gameClear && stage !== 'complete') {
+        setStage('complete')
+        return
+      }
+      if (game.gameOver && stage !== 'over') {
+        setStage('over')
+        return
+      }
+      if (!game.round) return
+      // 裏にいる間に次のラウンドが始まっていた → そのapproachへ直行
+      if (game.round.round !== lastPlayedRoundRef.current) {
+        lastPlayedRoundRef.current = game.round.round
+        setStage('approach')
+        transitionTo(CLIPS.approach)
+        return
+      }
+      // 同じラウンドで結果だけ先に届いていた → 残りの動画を待たず結果表示へ
+      if (game.roundResult && (stage === 'approach' || stage === 'awaitResult')) {
+        setStage('awaitResult') // revealエフェクトが拾って得票数→扉/床抜けに進む
+      }
+    }
+    document.addEventListener('visibilitychange', resync)
+    return () => document.removeEventListener('visibilitychange', resync)
+  }, [game.round, game.roundResult, game.gameOver, game.gameClear, stage, transitionTo])
 
   // 動画が最後まで再生されるたびに次のステージへ
   function handleVideoEnded() {
@@ -100,8 +135,8 @@ export function Inosishi() {
       return
     }
     if (stage === 'door') {
-      if (sock.roundResult && sock.roundResult.result === 'correct') {
-        if (sock.gameClear) {
+      if (game.roundResult && game.roundResult.result === 'correct') {
+        if (game.gameClear) {
           setStage('complete')
         } else {
           setStage('awaitRound') // 暗転フレームのまま次のround_startを待つ
@@ -118,112 +153,79 @@ export function Inosishi() {
   }
 
   function handleSelect(choiceIndex) {
-    if (sock.myVote !== null) return
-    sock.vote(choiceIndex)
+    if (game.myVote !== null) return
+    game.vote(choiceIndex)
   }
 
-  // ルーム画面ができるまではリロードで最初に戻す
+  // ゲーム状態だけ消してルーム管理画面へ戻る（WS接続・ルームは維持）
   function handleBackToRoom() {
-    window.location.reload()
+    clearActiveGame()
+    navigate(`/room/${room.roomId}`)
   }
 
   // ---- 画面の出し分け ----
-
-  if (isLoading) {
-    return <LoadingScreen onStart={() => setIsLoading(false)} />
-  }
-
-  if (sock.connection === 'destroyed') {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white gap-6">
-        <p className="text-3xl font-bold">ルームが解散されました</p>
-        <p className="text-gray-400">誰かの接続が切れるとルームは全員分破棄されます</p>
-        <button
-          onClick={handleBackToRoom}
-          className="px-8 py-3 rounded-lg bg-amber-500 text-gray-900 font-bold hover:bg-amber-400"
-        >
-          最初に戻る
-        </button>
-      </div>
-    )
-  }
 
   if (stage === 'complete') {
     return <CompleteScreen onBackToRoom={handleBackToRoom} />
   }
 
   if (stage === 'over') {
-    const over = sock.gameOver
+    const over = game.gameOver
     if (!over) {
       return <div className="h-screen bg-black" /> // game:over待ち（すぐ届く）
     }
     const missedQuestion =
-      sock.round && sock.roundResult
-        ? { text: sock.round.question, correctAnswer: sock.round.choices[sock.roundResult.correct_index] }
+      game.round && game.roundResult
+        ? { text: game.round.question, correctAnswer: game.round.choices[game.roundResult.correct_index] }
         : null
     return (
       <GameOverScreen
         reason={over.reason === 'wrong_answer' ? 'option-miss' : 'timeout'}
         correctCount={Math.max(0, (over.final_round || 1) - 1)}
-        totalCount={sock.round ? sock.round.total_rounds : 10}
+        totalCount={game.round ? game.round.total_rounds : 10}
         missedQuestion={missedQuestion}
-        playerAnswer={sock.myVote !== null && sock.round ? sock.round.choices[sock.myVote] : null}
+        playerAnswer={game.myVote !== null && game.round ? game.round.choices[game.myVote] : null}
         onBackToRoom={handleBackToRoom}
       />
     )
   }
 
-  // ゲーム中（round受信済み）は動画ステージ
-  if (sock.round && stage !== 'idle') {
-    const showPlates = stage === 'approach' || stage === 'awaitResult' || stage === 'reveal'
-    const counts =
-      stage === 'reveal' && sock.roundResult
-        ? [
-            (sock.roundResult.votes && sock.roundResult.votes['0'] ? sock.roundResult.votes['0'].length : 0),
-            (sock.roundResult.votes && sock.roundResult.votes['1'] ? sock.roundResult.votes['1'].length : 0),
-          ]
-        : null
+  if (!game.round || stage === 'idle') {
     return (
-      <VideoStage
-        src={src}
-        token={token}
-        visible={visible}
-        fadeMs={fadeMs}
-        onReady={handleReady}
-        onEnded={handleVideoEnded}
-      >
-        {showPlates && (
-          <ChoicePlates
-            questionText={sock.round.question}
-            choices={sock.round.choices}
-            selectedIndex={sock.myVote}
-            onSelect={handleSelect}
-            counts={counts}
-            votedInfo={sock.votedInfo}
-          />
-        )}
-      </VideoStage>
+      <div className="flex items-center justify-center h-screen bg-black text-white text-2xl font-bold animate-pulse">
+        まもなく開始…
+      </div>
     )
   }
 
-  if (sock.connection === 'lobby') {
-    return (
-      <RoomLobby
-        roomId={sock.roomId}
-        players={sock.players}
-        playerId={sock.playerId}
-        isHost={sock.isHost}
-        onStart={sock.startGame}
-      />
-    )
-  }
+  const showPlates = stage === 'approach' || stage === 'awaitResult' || stage === 'reveal'
+  const counts =
+    stage === 'reveal' && game.roundResult
+      ? [
+          game.roundResult.votes && game.roundResult.votes['0'] ? game.roundResult.votes['0'].length : 0,
+          game.roundResult.votes && game.roundResult.votes['1'] ? game.roundResult.votes['1'].length : 0,
+        ]
+      : null
 
   return (
-    <RoomEntry
-      onCreate={sock.createRoom}
-      onJoin={sock.joinRoom}
-      connecting={sock.connection === 'connecting'}
-      errorMessage={sock.errorMessage}
-    />
+    <VideoStage
+      src={src}
+      token={token}
+      visible={visible}
+      fadeMs={fadeMs}
+      onReady={handleReady}
+      onEnded={handleVideoEnded}
+    >
+      {showPlates && (
+        <ChoicePlates
+          questionText={game.round.question}
+          choices={game.round.choices}
+          selectedIndex={game.myVote}
+          onSelect={handleSelect}
+          counts={counts}
+          votedInfo={game.votedInfo}
+        />
+      )}
+    </VideoStage>
   )
 }
