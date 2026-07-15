@@ -102,7 +102,7 @@ export class RoomConnection {
         this.current = null
         entry.ws.onclose = null
         entry.ws.close()
-        this.handlers.onDestroyed?.(payload.reason)
+        this.handlers.onDestroyed?.(payload.reason, payload.disconnected_player_id)
         break
       case type === 'error':
         if (!entry.joined) {

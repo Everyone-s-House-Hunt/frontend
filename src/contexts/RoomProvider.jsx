@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoomContext } from './roomContext'
 import { RoomConnection } from '../services/wsRoomClient'
 
@@ -31,6 +31,19 @@ function generateRoomId() {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
+// ルーム破棄の理由を、ロビーで表示するユーザー向けの通知文にする。
+// reason: サーバーの room:destroyed の reason（player_disconnected 等）か、
+// 接続断の保険で使う connection_closed。
+function buildDestroyedNotice(room, reason, disconnectedPlayerId) {
+  if (reason === 'player_disconnected') {
+    const who = room?.players?.find((p) => p.player_id === disconnectedPlayerId)
+    if (who?.is_host) return 'ホストが退出したため、ルームが解散されました'
+    if (who?.nickname) return `${who.nickname}さんが退出したため、ルームが解散されました`
+    return 'メンバーが退出したため、ルームが解散されました'
+  }
+  return 'サーバーとの接続が切れたため、ルームが解散されました'
+}
+
 // players（バックエンドの PlayerInfo 配列）から表示用の情報を作る。
 // バックエンドの一覧は順序が不定なので、ホスト先頭 + 参加順（join_seq）で安定させる。
 function derivePlayers(players) {
@@ -53,8 +66,15 @@ export function RoomProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS)
   const [activeGame, setActiveGame] = useState(null) // { mode, startType, startPayload }
   const [serverError, setServerError] = useState('')
+  const [roomNotice, setRoomNotice] = useState('') // ルーム解散の通知（ロビーで表示）
   const connectionRef = useRef(null)
   const gameSubscribersRef = useRef(new Set())
+
+  // onDestroyed（接続時に一度だけ作るハンドラ）から最新のルーム情報を参照するための ref
+  const roomRef = useRef(null)
+  useEffect(() => {
+    roomRef.current = room
+  }, [room])
 
   const getConnection = useCallback(() => {
     if (!connectionRef.current) {
@@ -62,8 +82,10 @@ export function RoomProvider({ children }) {
         onPlayersUpdate: (players) => {
           setRoom((prev) => (prev ? { ...prev, ...derivePlayers(players) } : prev))
         },
-        onDestroyed: () => {
+        onDestroyed: (reason, disconnectedPlayerId) => {
           // ルーム破棄（誰かの切断など）。room を消せば各ページのガードがロビーへ戻す。
+          // 「突然タイトルに戻された」ように見えないよう、理由をロビーに表示する。
+          setRoomNotice(buildDestroyedNotice(roomRef.current, reason, disconnectedPlayerId))
           setRoom(null)
           setActiveGame(null)
         },
@@ -85,6 +107,7 @@ export function RoomProvider({ children }) {
   const connectAndJoin = useCallback(
     async ({ roomId, nickname, create = false }) => {
       setServerError('')
+      setRoomNotice('') // 新しいルームに入るので前回の解散通知は消す
       const joined = await getConnection().join({ roomId, nickname, create })
       setActiveGame(null)
       setRoom({
@@ -181,6 +204,7 @@ export function RoomProvider({ children }) {
         setSettings,
         activeGame,
         serverError,
+        roomNotice,
         createRoom,
         joinRoom,
         joinByInvite,

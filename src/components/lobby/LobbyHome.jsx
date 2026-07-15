@@ -62,7 +62,7 @@ function MenuCard({ card, onCreateRoom, onOpenJoin, disabled }) {
   )
 }
 
-export function LobbyHome({ onCreateRoom, onOpenJoin, loading, error }) {
+export function LobbyHome({ onCreateRoom, onOpenJoin, loading, error, notice }) {
   return (
     <main className="relative h-screen min-h-[720px] overflow-hidden bg-[#170e3e]">
       <div className="relative h-full min-h-[720px] w-full overflow-hidden">
@@ -98,11 +98,16 @@ export function LobbyHome({ onCreateRoom, onOpenJoin, loading, error }) {
             ))}
           </div>
 
-          {error && (
+          {error ? (
             <p className="mt-6 text-center text-xl font-black text-red-400 drop-shadow-[2px_2px_0_rgba(0,0,0,0.75)]">
               {error}
             </p>
-          )}
+          ) : notice ? (
+            // ルーム解散の通知。エラーではないので黄色で表示する
+            <p className="mt-6 text-center text-xl font-black text-yellow-300 drop-shadow-[2px_2px_0_rgba(0,0,0,0.75)]">
+              {notice}
+            </p>
+          ) : null}
         </div>
       </div>
     </main>
