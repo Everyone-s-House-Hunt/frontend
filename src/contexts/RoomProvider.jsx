@@ -4,7 +4,7 @@ import { RoomConnection } from '../services/wsRoomClient'
 
 // ルーム情報・ゲーム設定・WS接続を、ルート（画面）をまたいで共有するProvider。
 const INITIAL_SETTINGS = {
-  gameMode: 'zombieBullet',
+  gameMode: 'boarPanic',
   questionSource: 'random',
 }
 
