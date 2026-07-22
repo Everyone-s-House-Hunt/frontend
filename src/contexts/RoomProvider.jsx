@@ -4,7 +4,7 @@ import { RoomConnection } from '../services/wsRoomClient'
 
 // ルーム情報・ゲーム設定・WS接続を、ルート（画面）をまたいで共有するProvider。
 const INITIAL_SETTINGS = {
-  gameMode: 'zombieBullet',
+  gameMode: 'boarPanic',
   questionSource: 'random',
 }
 
@@ -182,6 +182,9 @@ export function RoomProvider({ children }) {
     setActiveGame(null)
   }, [getConnection])
 
+  // ゲーム終了後に「ルームに戻る」で使う（接続は維持したままゲーム状態だけ消す）
+  const clearActiveGame = useCallback(() => setActiveGame(null), [])
+
   // ゲーム画面がゲーム中メッセージを購読するためのAPI（戻り値は購読解除関数）
   const subscribeGame = useCallback((callback) => {
     gameSubscribersRef.current.add(callback)
@@ -208,6 +211,7 @@ export function RoomProvider({ children }) {
         renameSelf,
         startGame,
         leaveRoom,
+        clearActiveGame,
         subscribeGame,
         sendGameMessage,
       }}

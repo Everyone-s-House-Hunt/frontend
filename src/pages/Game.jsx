@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useRoom } from '../hooks/useRoom'
+import { Inosishi } from './games/Inosishi'
 import { Mansion } from './games/Mansion'
 import { WordPiece } from './games/WordPiece'
 
@@ -25,6 +26,9 @@ export function Game() {
 
   if (activeGame.mode === 'wordPiece') {
     return <WordPiece />
+  }
+  if (activeGame.mode === 'boarPanic') {
+    return <Inosishi />
   }
   return <Mansion />
 }
