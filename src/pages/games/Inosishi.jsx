@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRoom } from '../../hooks/useRoom'
 import { usePanicGame } from '../../hooks/usePanicGame'
@@ -18,8 +18,23 @@ const CLIPS = {
 // ラウンド結果（得票数バッジ）を見せる時間
 const REVEAL_MS = 1500
 
+function countVotes(result) {
+  return [
+    result.votes && result.votes['0'] ? result.votes['0'].length : 0,
+    result.votes && result.votes['1'] ? result.votes['1'].length : 0,
+  ]
+}
+
 // イノシシパニック本体。ルーム入室〜ゲーム開始はロビー側（RoomProvider）が済ませていて、
 // この画面は /room/:roomId/game で activeGame.mode === 'boarPanic' のときに表示される。
+//
+// 同期の設計:
+// - サーバーは結果の3秒後に次ラウンドを送ってくるが、扉の演出(約5秒)は最後まで見せる
+// - そのため「表示中のラウンド(displayRound)」をページ側に固定し、
+//   次ラウンドのデータはdoor再生完了(awaitRound)まで採用しない（問題文の被り防止）
+// - 結果も displayResult に固定する（usePanicGameの roundResult は次のround_startで
+//   クリアされるため、直接参照するとdoor終了時の正誤判定がズレる）
+// - 遅れは「結果受信から約2秒」の定数でラウンドごとにリセットされ、蓄積しない
 export function Inosishi() {
   const navigate = useNavigate()
   const { room, clearActiveGame } = useRoom()
@@ -29,7 +44,9 @@ export function Inosishi() {
   // 'idle'(round待ち) | 'approach'(出題+投票) | 'awaitResult'(動画終了・結果待ち)
   // | 'reveal'(得票数表示) | 'door' | 'wrong' | 'awaitRound'(次ラウンド待ち) | 'over' | 'complete'
   const [stage, setStage] = useState('idle')
-  const lastPlayedRoundRef = useRef(0)
+  // いま画面に出しているラウンドとその結果（サーバーの最新値とは独立に固定する）
+  const [displayRound, setDisplayRound] = useState(null)
+  const [displayResult, setDisplayResult] = useState(null)
 
   const { src, token, visible, fadeMs, transitionTo, handleReady } = useVideoSequence(CLIPS.approach)
 
@@ -42,44 +59,48 @@ export function Inosishi() {
     })
   }, [])
 
-  // ラウンド開始: 初回は即approach、2問目以降はdoor再生終了(awaitRound)と揃ったら
+  // ラウンド採用: 初回(idle) と door再生完了後(awaitRound) のみ。
+  // 演出中に届いた次ラウンドはバッファされ、扉が開き終わってから採用される
   useEffect(() => {
     if (!game.round) return
-    if (game.round.round === lastPlayedRoundRef.current) return
+    if (displayRound && game.round.round === displayRound.round) return
+    if (stage !== 'idle' && stage !== 'awaitRound') return
+    setDisplayRound(game.round)
+    setDisplayResult(null)
     if (stage === 'idle') {
-      lastPlayedRoundRef.current = game.round.round
       setStage('approach')
       return
     }
-    if (stage === 'awaitRound') {
-      lastPlayedRoundRef.current = game.round.round
-      setStage('approach')
-      transitionTo(CLIPS.approach)
-    }
-  }, [game.round, stage, transitionTo])
+    setStage('approach')
+    transitionTo(CLIPS.approach)
+  }, [game.round, stage, displayRound, transitionTo])
 
-  // approach動画が終わって結果が届いたら得票数を見せる
+  // 表示中ラウンドの結果が届いたら固定する
   useEffect(() => {
-    if (stage === 'awaitResult' && game.roundResult) {
+    if (!game.roundResult || !displayRound) return
+    if (game.roundResult.round !== displayRound.round) return
+    setDisplayResult(game.roundResult)
+  }, [game.roundResult, displayRound])
+
+  // 結果が分かったら歩きの残りを待たずに得票数表示へ
+  // （全員の投票が早い場合、動画終了前でもカットしてサーバーの進行に追従する）
+  useEffect(() => {
+    if ((stage === 'approach' || stage === 'awaitResult') && displayResult) {
       setStage('reveal')
     }
-  }, [stage, game.roundResult])
+  }, [stage, displayResult])
 
   // 得票数を1.5秒見せてから扉/床抜けへ
   useEffect(() => {
     if (stage !== 'reveal') return
     const t = setTimeout(() => {
-      const result = game.roundResult
-      const counts = [
-        result.votes && result.votes['0'] ? result.votes['0'].length : 0,
-        result.votes && result.votes['1'] ? result.votes['1'].length : 0,
-      ]
-      if (result.result === 'tie') {
+      if (displayResult.result === 'tie') {
         // 同票（0対0含む）は扉を開けずにそのまま床抜け
         setStage('wrong')
         transitionTo(CLIPS.wrong)
         return
       }
+      const counts = countVotes(displayResult)
       const majority = counts[0] > counts[1] ? 0 : 1
       setStage('door')
       transitionTo(majority === 0 ? CLIPS.doorLeft : CLIPS.doorRight)
@@ -95,13 +116,10 @@ export function Inosishi() {
     }
   }, [stage, game.gameClear])
 
-  // 裏タブ対策: ブラウザは裏タブの動画・タイマーを止めるため、動画のended頼みの
-  // 進行は裏で止まる。ゲームの正はサーバー状態なので、表に戻った瞬間に
-  // 「本来いるべきステージ」まで一気に追いつく（途中の演出はスキップ）
+  // 裏タブ対策: 表に戻った瞬間に「本来いるべきステージ」まで追いつく（演出スキップ）
   useEffect(() => {
     function resync() {
       if (document.visibilityState !== 'visible') return
-      // 終了系が届いていたら最優先でそこへ
       if (game.gameClear && stage !== 'complete') {
         setStage('complete')
         return
@@ -111,35 +129,32 @@ export function Inosishi() {
         return
       }
       if (!game.round) return
-      // 裏にいる間に次のラウンドが始まっていた → そのapproachへ直行
-      if (game.round.round !== lastPlayedRoundRef.current) {
-        lastPlayedRoundRef.current = game.round.round
+      // 裏にいる間に次のラウンドが始まっていた → 演出を飛ばして新しいapproachへ直行
+      if (!displayRound || game.round.round !== displayRound.round) {
+        setDisplayRound(game.round)
+        setDisplayResult(null)
         setStage('approach')
         transitionTo(CLIPS.approach)
-        return
       }
-      // 同じラウンドで結果だけ先に届いていた → 残りの動画を待たず結果表示へ
-      if (game.roundResult && (stage === 'approach' || stage === 'awaitResult')) {
-        setStage('awaitResult') // revealエフェクトが拾って得票数→扉/床抜けに進む
-      }
+      // 同ラウンドで結果だけ届いていた場合は displayResult 経由のエフェクトが拾う
     }
     document.addEventListener('visibilitychange', resync)
     return () => document.removeEventListener('visibilitychange', resync)
-  }, [game.round, game.roundResult, game.gameOver, game.gameClear, stage, transitionTo])
+  }, [game.round, game.gameOver, game.gameClear, stage, displayRound, transitionTo])
 
   // 動画が最後まで再生されるたびに次のステージへ
   function handleVideoEnded() {
     if (stage === 'approach') {
-      // 動画(8秒)終了。結果はサーバーの10秒タイマー or 全員投票で届くまで最終フレームで待つ
+      // 動画(8秒)終了。結果が届くまで最終フレーム（扉の前）で待つ
       setStage('awaitResult')
       return
     }
     if (stage === 'door') {
-      if (game.roundResult && game.roundResult.result === 'correct') {
+      if (displayResult && displayResult.result === 'correct') {
         if (game.gameClear) {
           setStage('complete')
         } else {
-          setStage('awaitRound') // 暗転フレームのまま次のround_startを待つ
+          setStage('awaitRound') // 暗転フレームのまま。次ラウンドは採用エフェクトが拾う
         }
       } else {
         setStage('wrong')
@@ -154,6 +169,8 @@ export function Inosishi() {
 
   function handleSelect(choiceIndex) {
     if (game.myVote !== null) return
+    // 表示中のラウンドがサーバーの現在ラウンドである時だけ投票できる
+    if (!game.round || !displayRound || game.round.round !== displayRound.round) return
     game.vote(choiceIndex)
   }
 
@@ -175,22 +192,22 @@ export function Inosishi() {
       return <div className="h-screen bg-black" /> // game:over待ち（すぐ届く）
     }
     const missedQuestion =
-      game.round && game.roundResult
-        ? { text: game.round.question, correctAnswer: game.round.choices[game.roundResult.correct_index] }
+      displayRound && displayResult
+        ? { text: displayRound.question, correctAnswer: displayRound.choices[displayResult.correct_index] }
         : null
     return (
       <GameOverScreen
         reason={over.reason === 'wrong_answer' ? 'option-miss' : 'timeout'}
         correctCount={Math.max(0, (over.final_round || 1) - 1)}
-        totalCount={game.round ? game.round.total_rounds : 10}
+        totalCount={displayRound ? displayRound.total_rounds : 10}
         missedQuestion={missedQuestion}
-        playerAnswer={game.myVote !== null && game.round ? game.round.choices[game.myVote] : null}
+        playerAnswer={game.myVote !== null && displayRound ? displayRound.choices[game.myVote] : null}
         onBackToRoom={handleBackToRoom}
       />
     )
   }
 
-  if (!game.round || stage === 'idle') {
+  if (!displayRound || stage === 'idle') {
     return (
       <div className="flex items-center justify-center h-screen bg-black text-white text-2xl font-bold animate-pulse">
         まもなく開始…
@@ -199,13 +216,7 @@ export function Inosishi() {
   }
 
   const showPlates = stage === 'approach' || stage === 'awaitResult' || stage === 'reveal'
-  const counts =
-    stage === 'reveal' && game.roundResult
-      ? [
-          game.roundResult.votes && game.roundResult.votes['0'] ? game.roundResult.votes['0'].length : 0,
-          game.roundResult.votes && game.roundResult.votes['1'] ? game.roundResult.votes['1'].length : 0,
-        ]
-      : null
+  const counts = stage === 'reveal' && displayResult ? countVotes(displayResult) : null
 
   return (
     <VideoStage
@@ -218,8 +229,8 @@ export function Inosishi() {
     >
       {showPlates && (
         <ChoicePlates
-          questionText={game.round.question}
-          choices={game.round.choices}
+          questionText={displayRound.question}
+          choices={displayRound.choices}
           selectedIndex={game.myVote}
           onSelect={handleSelect}
           counts={counts}
