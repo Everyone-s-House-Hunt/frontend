@@ -138,6 +138,7 @@ export function RoomManagement({
   onRename,
   loading,
   error,
+  notice,
 }) {
   const [stageScale, setStageScale] = useState(calculateStageScale)
 
@@ -210,10 +211,11 @@ export function RoomManagement({
             </div>
           </div>
 
-          {error && (
-            <p className="absolute bottom-[152px] left-1/2 -translate-x-1/2 text-lg font-black text-red-700">
-              {error}
-            </p>
+          {(error || notice) && (
+            <div className="absolute bottom-[142px] left-1/2 w-[760px] -translate-x-1/2 text-center text-lg font-black">
+              {notice && <p className="text-[#fff36d]">{notice}</p>}
+              {error && <p className="text-red-700">{error}</p>}
+            </div>
           )}
 
           <div className="absolute bottom-16 left-1/2 flex -translate-x-1/2 items-center justify-center gap-8">

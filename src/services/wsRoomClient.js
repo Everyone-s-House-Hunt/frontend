@@ -6,7 +6,7 @@
 const WS_BASE_URL = import.meta.env?.VITE_WS_URL || 'ws://localhost:8080'
 
 export class RoomConnection {
-  // handlers: { onPlayersUpdate, onDestroyed, onServerError, onGameMessage }
+  // handlers: { onPlayersUpdate, onPlayerLeft, onDestroyed, onServerError, onGameMessage }
   constructor(handlers) {
     this.handlers = handlers
     this.current = null // { roomId, ws, joined, reject }
@@ -101,6 +101,13 @@ export class RoomConnection {
         break
       case type === 'room:player_joined':
         this.handlers.onPlayersUpdate?.(payload.players)
+        break
+      case type === 'room:player_left':
+        if (this.handlers.onPlayerLeft) {
+          this.handlers.onPlayerLeft(payload)
+        } else {
+          this.handlers.onPlayersUpdate?.(payload.players)
+        }
         break
       case type === 'room:destroyed':
         // サーバーが続けて接続を閉じるので、こちらも後始末して通知する
