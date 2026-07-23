@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRoom } from './useRoom'
 
 // イノシシパニックのゲーム進行ロジック。
@@ -16,20 +16,32 @@ export function usePanicGame() {
   const [roundResult, setRoundResult] = useState(null)
   const [gameOver, setGameOver] = useState(null)
   const [gameClear, setGameClear] = useState(null)
+  const leftPlayerIdsRef = useRef(new Set())
 
   useEffect(
     () =>
       subscribeGame((type, payload) => {
         switch (type) {
           case 'game:round_start':
+            leftPlayerIdsRef.current.clear()
             setRound(payload)
             setMyVote(null)
             setVotedInfo(null)
             setRoundResult(null)
             break
           case 'game:vote_received':
+            if (leftPlayerIdsRef.current.has(payload.player_id)) break
+            setVotedInfo((prev) =>
+              prev && payload.total_count > prev.total
+                ? prev
+                : { voted: payload.voted_count, total: payload.total_count },
+            )
+            break
+          case 'game:player_left': {
+            leftPlayerIdsRef.current.add(payload.disconnected_player_id)
             setVotedInfo({ voted: payload.voted_count, total: payload.total_count })
             break
+          }
           case 'game:round_result':
             setRoundResult(payload)
             break

@@ -36,3 +36,106 @@ test('send and sendGameStart report whether a WebSocket message was sent', () =>
     globalThis.WebSocket = originalWebSocket
   }
 })
+
+test('player leave updates the member list and game cancellation is forwarded', async () => {
+  const originalWebSocket = globalThis.WebSocket
+  const sockets = []
+
+  class MockWebSocket {
+    static OPEN = 1
+
+    constructor() {
+      this.readyState = MockWebSocket.OPEN
+      this.sent = []
+      sockets.push(this)
+    }
+
+    send(message) {
+      this.sent.push(JSON.parse(message))
+    }
+
+    close() {
+      this.readyState = 3
+    }
+  }
+
+  globalThis.WebSocket = MockWebSocket
+
+  try {
+    const playerLeftEvents = []
+    const gameMessages = []
+    const connection = new RoomConnection({
+      onPlayerLeft: (payload) => playerLeftEvents.push(payload),
+      onGameMessage: (type, payload) => gameMessages.push({ type, payload }),
+    })
+
+    const joinedPromise = connection.join({
+      roomId: '123456',
+      nickname: 'ホスト',
+      create: true,
+    })
+    const socket = sockets[0]
+    socket.onopen()
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'room:joined',
+        payload: { player_id: 'host', is_host: true, players: [] },
+      }),
+    })
+    await joinedPromise
+
+    const remaining = [{ player_id: 'host', nickname: 'ホスト', is_host: true, join_seq: 0 }]
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'room:player_left',
+        payload: { player_id: 'guest', nickname: 'ゲスト', players: remaining },
+      }),
+    })
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'game:player_left',
+        payload: {
+          disconnected_player_id: 'guest',
+          disconnected_nickname: 'ゲスト',
+          players: remaining,
+          current_player_id: 'host',
+          voted_count: 0,
+          total_count: 1,
+        },
+      }),
+    })
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'game:cancelled',
+        payload: { reason: 'player_disconnected', disconnected_player_id: 'guest' },
+      }),
+    })
+
+    assert.deepEqual(playerLeftEvents, [
+      {
+        player_id: 'guest',
+        nickname: 'ゲスト',
+        players: remaining,
+      },
+    ])
+    assert.deepEqual(gameMessages, [
+      {
+        type: 'game:player_left',
+        payload: {
+          disconnected_player_id: 'guest',
+          disconnected_nickname: 'ゲスト',
+          players: remaining,
+          current_player_id: 'host',
+          voted_count: 0,
+          total_count: 1,
+        },
+      },
+      {
+        type: 'game:cancelled',
+        payload: { reason: 'player_disconnected', disconnected_player_id: 'guest' },
+      },
+    ])
+  } finally {
+    globalThis.WebSocket = originalWebSocket
+  }
+})

@@ -7,8 +7,17 @@ import { useRoom } from '../hooks/useRoom'
 export function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
-  const { room, settings, setSettings, startGame, leaveRoom, renameSelf, activeGame, serverError } =
-    useRoom()
+  const {
+    room,
+    settings,
+    setSettings,
+    startGame,
+    leaveRoom,
+    renameSelf,
+    activeGame,
+    serverError,
+    roomEventNotice,
+  } = useRoom()
   const [starting, setStarting] = useState(false)
 
   // ガード: 直リンク・リロード・ルーム破棄でルーム情報が無い場合はロビーへ戻す。
@@ -35,7 +44,7 @@ export function Room() {
   }
 
   // タイトルへ戻る = WSを切断してロビーへ。
-  // 注意: バックエンドの仕様上、誰か1人が切断するとルームは破棄され全員がロビーに戻される。
+  // 退出者だけ接続を閉じ、残った参加者は同じルームを維持する。
   function handleBackToTitle() {
     leaveRoom()
     navigate('/', { replace: true })
@@ -51,6 +60,7 @@ export function Room() {
       onRename={renameSelf}
       loading={loading}
       error={serverError}
+      notice={roomEventNotice}
     />
   )
 }

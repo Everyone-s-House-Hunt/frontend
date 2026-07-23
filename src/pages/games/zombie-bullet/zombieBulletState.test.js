@@ -102,3 +102,70 @@ test('duplicate delivery does not add the same accepted answer twice', () => {
   const twice = reduceBulletGame(once, hit)
   assert.deepEqual(twice.used, ['東京'])
 })
+
+test('player leave updates roster and turn without resetting progress or timer', () => {
+  const progressed = reduceBulletGame(createBulletGame(startPayload, 1_000), {
+    type: 'game:bullet_hit',
+    payload: {
+      player_id: 'host',
+      answer: '東京',
+      correct_count: 1,
+      current_player_id: 'guest',
+    },
+    receivedAt: 2_000,
+  })
+
+  const continued = reduceBulletGame(progressed, {
+    type: 'game:player_left',
+    payload: {
+      disconnected_player_id: 'guest',
+      disconnected_nickname: 'ゲスト',
+      players: [{ player_id: 'host', nickname: 'ホスト', join_seq: 0 }],
+      current_player_id: 'host',
+      total_count: 1,
+      voted_count: 0,
+    },
+    receivedAt: 3_000,
+  })
+
+  assert.deepEqual(continued.players.map((player) => player.player_id), ['host'])
+  assert.equal(continued.currentPlayerId, 'host')
+  assert.equal(continued.correctCount, 1)
+  assert.deepEqual(continued.used, ['東京'])
+  assert.equal(continued.startedAt, 1_000)
+  assert.equal(continued.phase, 'playing')
+  assert.equal(continued.feedback.kind, 'player_left')
+  assert.equal(continued.feedback.nickname, 'ゲスト')
+})
+
+test('late hit and miss events cannot restore a departed current player', () => {
+  const continued = reduceBulletGame(createBulletGame(startPayload, 1_000), {
+    type: 'game:player_left',
+    payload: {
+      disconnected_player_id: 'guest',
+      players: [{ player_id: 'host', nickname: 'ホスト', join_seq: 0 }],
+      current_player_id: 'host',
+    },
+  })
+
+  const lateHit = reduceBulletGame(continued, {
+    type: 'game:bullet_hit',
+    payload: {
+      player_id: 'guest',
+      answer: '東京',
+      correct_count: 1,
+      current_player_id: 'guest',
+    },
+  })
+  const lateMiss = reduceBulletGame(lateHit, {
+    type: 'game:bullet_miss',
+    payload: {
+      player_id: 'guest',
+      reason: 'wrong',
+      current_player_id: 'guest',
+    },
+  })
+
+  assert.equal(lateHit.currentPlayerId, 'host')
+  assert.equal(lateMiss.currentPlayerId, 'host')
+})

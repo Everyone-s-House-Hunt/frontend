@@ -305,6 +305,18 @@ function ZombieBullet() {
       return;
     }
 
+    if (type === "game:player_left") {
+      setPendingAnswer(false);
+      setVisibleFeedback(nextGame.feedback);
+      const visual = visualRef.current;
+      const visualLane = visualLaneAt(visual, now);
+      const nextLane = playerLane(nextGame.players, nextGame.currentPlayerId);
+      visual.fromLane = visualLane;
+      visual.toLane = nextLane;
+      visual.moveStartedAt = now;
+      return;
+    }
+
     if (type === "game:clear") {
       setPendingAnswer(false);
       const visual = visualRef.current;
@@ -878,7 +890,7 @@ function ZombieBullet() {
   const timerStyle = { "--time-ratio": timeRatio };
   const isTimerCritical = phase === "playing" && remainingMs <= 1e4;
   const feedbackKind = visibleFeedback?.kind ?? (serverError ? "incorrect" : "");
-  const feedbackMessage = visibleFeedback?.connectionError ? "サーバーへ回答を送信できませんでした" : visibleFeedback?.kind === "correct" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」命中！` : visibleFeedback?.kind === "duplicate" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」は回答済み` : visibleFeedback?.kind === "incorrect" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」は不正解。同じ人が続行` : serverError || " ";
+  const feedbackMessage = visibleFeedback?.connectionError ? "サーバーへ回答を送信できませんでした" : visibleFeedback?.kind === "correct" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」命中！` : visibleFeedback?.kind === "duplicate" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」は回答済み` : visibleFeedback?.kind === "incorrect" ? `${playerName(game.players, visibleFeedback.playerId)}「${visibleFeedback.answer}」は不正解。同じ人が続行` : visibleFeedback?.kind === "player_left" ? `${visibleFeedback.nickname}さんが退出。残ったメンバーで続行` : serverError || " ";
 
   return <div className="zombie-bullet-game">
     <main className={`game-shell phase-${phase}`} data-game-phase={phase}>

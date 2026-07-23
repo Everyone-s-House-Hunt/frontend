@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RoomContext } from './roomContext'
+import { derivePlayers, updateRoomPlayers } from './roomState'
 import { RoomConnection } from '../services/wsRoomClient'
 
 // ルーム情報・ゲーム設定・WS接続を、ルート（画面）をまたいで共有するProvider。
@@ -44,31 +45,16 @@ function buildDestroyedNotice(room, reason, disconnectedPlayerId) {
   return 'サーバーとの接続が切れたため、ルームが解散されました'
 }
 
-// players（バックエンドの PlayerInfo 配列）から表示用の情報を作る。
-// バックエンドの一覧は順序が不定なので、ホスト先頭 + 参加順（join_seq）で安定させる。
-function derivePlayers(players) {
-  const sorted = [...players].sort(
-    (a, b) =>
-      Number(b.is_host) - Number(a.is_host) ||
-      (a.join_seq ?? 0) - (b.join_seq ?? 0) ||
-      a.player_id.localeCompare(b.player_id),
-  )
-  const named = sorted.filter((p) => p.nickname) // room:join 前の接続者は名前が空なので表示から除く
-  return {
-    players: sorted,
-    hostName: named.find((p) => p.is_host)?.nickname ?? '',
-    members: named.map((p) => p.nickname),
-  }
-}
-
 export function RoomProvider({ children }) {
   const [room, setRoom] = useState(null)
   const [settings, setSettings] = useState(INITIAL_SETTINGS)
   const [activeGame, setActiveGame] = useState(null) // { mode, startType, startPayload, startedAt }
   const [serverError, setServerError] = useState('')
   const [roomNotice, setRoomNotice] = useState('') // ルーム解散の通知（ロビーで表示）
+  const [roomEventNotice, setRoomEventNotice] = useState('') // 退出・ゲーム中断の通知
   const connectionRef = useRef(null)
   const gameSubscribersRef = useRef(new Set())
+  const lastLeftPlayerRef = useRef(null)
 
   // onDestroyed（接続時に一度だけ作るハンドラ）から最新のルーム情報を参照するための ref
   const roomRef = useRef(null)
@@ -80,7 +66,12 @@ export function RoomProvider({ children }) {
     if (!connectionRef.current) {
       connectionRef.current = new RoomConnection({
         onPlayersUpdate: (players) => {
-          setRoom((prev) => (prev ? { ...prev, ...derivePlayers(players) } : prev))
+          setRoom((prev) => updateRoomPlayers(prev, players))
+        },
+        onPlayerLeft: ({ player_id: playerId, nickname, players }) => {
+          lastLeftPlayerRef.current = { playerId, nickname }
+          setRoom((prev) => updateRoomPlayers(prev, players))
+          setRoomEventNotice(`${nickname || 'メンバー'}さんが退出しました`)
         },
         onDestroyed: (reason, disconnectedPlayerId) => {
           // ルーム破棄（誰かの切断など）。room を消せば各ページのガードがロビーへ戻す。
@@ -91,6 +82,18 @@ export function RoomProvider({ children }) {
         },
         onServerError: (message) => setServerError(message),
         onGameMessage: (type, payload) => {
+          if (type === 'game:cancelled') {
+            // 参加者退出で中断された場合は接続とルームを残し、ゲーム画面だけ閉じる。
+            const leftPlayer = lastLeftPlayerRef.current
+            const nickname =
+              leftPlayer?.playerId === payload.disconnected_player_id
+                ? leftPlayer.nickname
+                : 'メンバー'
+            setRoomEventNotice(`${nickname || 'メンバー'}さんが退出したためゲームを中断しました`)
+            setServerError('')
+            setActiveGame(null)
+          }
+
           const mode = GAME_START_TO_MODE[type]
           if (mode) {
             const startedAt = Date.now()
@@ -112,6 +115,8 @@ export function RoomProvider({ children }) {
     async ({ roomId, nickname, create = false }) => {
       setServerError('')
       setRoomNotice('') // 新しいルームに入るので前回の解散通知は消す
+      setRoomEventNotice('')
+      lastLeftPlayerRef.current = null
       const joined = await getConnection().join({ roomId, nickname, create })
       setActiveGame(null)
       setRoom({
@@ -177,6 +182,7 @@ export function RoomProvider({ children }) {
   // ゲーム開始（ホストのみ有効）。結果はWSのブロードキャスト（activeGame）かエラーで返る。
   const startGame = useCallback(() => {
     setServerError('')
+    setRoomEventNotice('')
     return getConnection().sendGameStart(BACKEND_GAME_MODE[settings.gameMode])
   }, [getConnection, settings.gameMode])
 
@@ -184,6 +190,8 @@ export function RoomProvider({ children }) {
     getConnection().close()
     setRoom(null)
     setActiveGame(null)
+    setRoomEventNotice('')
+    lastLeftPlayerRef.current = null
   }, [getConnection])
 
   // ゲーム終了後に「ルームに戻る」で使う（接続は維持したままゲーム状態だけ消す）
@@ -209,6 +217,7 @@ export function RoomProvider({ children }) {
         activeGame,
         serverError,
         roomNotice,
+        roomEventNotice,
         createRoom,
         joinRoom,
         joinByInvite,
