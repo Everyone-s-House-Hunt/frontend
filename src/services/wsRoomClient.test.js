@@ -19,9 +19,11 @@ test('send and sendGameStart report whether a WebSocket message was sent', () =>
 
     assert.equal(connection.send('game:bullet_submit', { answer: '東京' }), true)
     assert.equal(connection.sendGameStart('bullet'), true)
+    assert.equal(connection.sendBackToLobby(), true)
     assert.deepEqual(sent, [
       { type: 'game:bullet_submit', payload: { answer: '東京' } },
       { type: 'game:start', payload: { game_mode: 'bullet' } },
+      { type: 'room:back_to_lobby', payload: {} },
     ])
 
     connection.current.ws.readyState = 0
@@ -135,6 +137,65 @@ test('player leave updates the member list and game cancellation is forwarded', 
         payload: { reason: 'player_disconnected', disconnected_player_id: 'guest' },
       },
     ])
+  } finally {
+    globalThis.WebSocket = originalWebSocket
+  }
+})
+
+test('room:player_status updates the player list like room:player_joined', async () => {
+  const originalWebSocket = globalThis.WebSocket
+  const sockets = []
+
+  class MockWebSocket {
+    static OPEN = 1
+
+    constructor() {
+      this.readyState = MockWebSocket.OPEN
+      this.sent = []
+      sockets.push(this)
+    }
+
+    send(message) {
+      this.sent.push(JSON.parse(message))
+    }
+
+    close() {
+      this.readyState = 3
+    }
+  }
+
+  globalThis.WebSocket = MockWebSocket
+
+  try {
+    const playersUpdates = []
+    const connection = new RoomConnection({
+      onPlayersUpdate: (players) => playersUpdates.push(players),
+    })
+
+    const joinedPromise = connection.join({
+      roomId: '123456',
+      nickname: 'ホスト',
+      create: true,
+    })
+    const socket = sockets[0]
+    socket.onopen()
+    socket.onmessage({
+      data: JSON.stringify({
+        type: 'room:joined',
+        payload: { player_id: 'host', is_host: true, players: [] },
+      }),
+    })
+    await joinedPromise
+
+    const players = [
+      { player_id: 'host', nickname: 'ホスト', is_host: true, join_seq: 0, in_lobby: true },
+      { player_id: 'guest', nickname: 'ゲスト', is_host: false, join_seq: 1, in_lobby: false },
+    ]
+    socket.onmessage({
+      data: JSON.stringify({ type: 'room:player_status', payload: { players } }),
+    })
+
+    assert.deepEqual(playersUpdates, [players])
   } finally {
     globalThis.WebSocket = originalWebSocket
   }

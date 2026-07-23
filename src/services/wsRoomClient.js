@@ -69,6 +69,12 @@ export class RoomConnection {
     return this.send('game:start', { game_mode: gameMode })
   }
 
+  // ゲーム結果画面からルーム管理画面に戻ったことをサーバーへ知らせる。
+  // 全員がこれを送るまで、ホストの game:start はサーバー側で拒否される。
+  sendBackToLobby() {
+    return this.send('room:back_to_lobby', {})
+  }
+
   // 自分から切断する（画面遷移や新しいルームへの入り直し時）。ハンドラへの通知はしない。
   close() {
     const entry = this.current
@@ -108,6 +114,10 @@ export class RoomConnection {
         } else {
           this.handlers.onPlayersUpdate?.(payload.players)
         }
+        break
+      case type === 'room:player_status':
+        // 各プレイヤーのロビー在席状況（in_lobby）の更新。一覧の形はplayer_joinedと同じ。
+        this.handlers.onPlayersUpdate?.(payload.players)
         break
       case type === 'room:destroyed':
         // サーバーが続けて接続を閉じるので、こちらも後始末して通知する
