@@ -4,6 +4,7 @@ import { useRoom } from '../hooks/useRoom'
 import { Inosishi } from './games/Inosishi'
 import { Mansion } from './games/Mansion'
 import { WordPiece } from './games/WordPiece'
+import ZombieBullet from './games/zombie-bullet/ZombieBullet'
 
 // ゲームページ（/room/:roomId/game）。WSで通知されたゲームモードに応じて画面を出し分ける。
 export function Game() {
@@ -29,6 +30,9 @@ export function Game() {
   }
   if (activeGame.mode === 'boarPanic') {
     return <Inosishi />
+  }
+  if (activeGame.mode === 'zombieBullet') {
+    return <ZombieBullet />
   }
   return <Mansion />
 }
