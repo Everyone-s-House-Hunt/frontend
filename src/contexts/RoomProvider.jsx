@@ -197,6 +197,12 @@ export function RoomProvider({ children }) {
   // ゲーム終了後に「ルームに戻る」で使う（接続は維持したままゲーム状態だけ消す）
   const clearActiveGame = useCallback(() => setActiveGame(null), [])
 
+  // ロビー画面（ルーム管理画面）に戻ったことをサーバーへ知らせる。
+  // これを全員が送るまで、ホストは次のゲームを開始できない。
+  const confirmBackToLobby = useCallback(() => {
+    getConnection().sendBackToLobby()
+  }, [getConnection])
+
   // ゲーム画面がゲーム中メッセージを購読するためのAPI（戻り値は購読解除関数）
   const subscribeGame = useCallback((callback) => {
     gameSubscribersRef.current.add(callback)
@@ -225,6 +231,7 @@ export function RoomProvider({ children }) {
         startGame,
         leaveRoom,
         clearActiveGame,
+        confirmBackToLobby,
         subscribeGame,
         sendGameMessage,
       }}

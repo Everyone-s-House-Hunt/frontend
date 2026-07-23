@@ -142,6 +142,11 @@ export function RoomManagement({
 }) {
   const [stageScale, setStageScale] = useState(calculateStageScale)
 
+  // 前回のゲームの結果画面からまだロビーに戻っていないメンバー。
+  // これが残っている間はホストが次のゲームを開始できない（サーバー側でも拒否される）。
+  const waitingPlayers = (room.players ?? []).filter((p) => p.nickname && p.in_lobby === false)
+  const waitingForReturn = waitingPlayers.length > 0
+
   useEffect(() => {
     function updateStageScale() {
       setStageScale(calculateStageScale())
@@ -211,10 +216,15 @@ export function RoomManagement({
             </div>
           </div>
 
-          {(error || notice) && (
+          {(error || notice || waitingForReturn) && (
             <div className="absolute bottom-[142px] left-1/2 w-[760px] -translate-x-1/2 text-center text-lg font-black">
               {notice && <p className="text-[#fff36d]">{notice}</p>}
               {error && <p className="text-red-700">{error}</p>}
+              {!error && waitingForReturn && (
+                <p className="text-[#fff36d]">
+                  {waitingPlayers.map((p) => p.nickname).join('、')}さんがロビーに戻るのを待っています
+                </p>
+              )}
             </div>
           )}
 
@@ -230,7 +240,7 @@ export function RoomManagement({
             <button
               type="button"
               onClick={onStartGame}
-              disabled={loading}
+              disabled={loading || waitingForReturn}
               className="flex h-20 w-[300px] items-center justify-center whitespace-nowrap border-[3px] border-white bg-white/70 p-2 text-4xl font-black leading-[22px] text-black opacity-95 backdrop-blur-sm transition hover:bg-white/85 disabled:cursor-wait disabled:opacity-50"
             >
               <span className="heading-outline-sm">{loading ? '開始中...' : 'ゲームスタート'}</span>

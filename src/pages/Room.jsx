@@ -17,6 +17,7 @@ export function Room() {
     activeGame,
     serverError,
     roomEventNotice,
+    confirmBackToLobby,
   } = useRoom()
   const [starting, setStarting] = useState(false)
 
@@ -27,6 +28,12 @@ export function Room() {
   useEffect(() => {
     if (!hasRoom) navigate('/', { replace: true })
   }, [hasRoom, navigate])
+
+  // このページが表示された = ロビー画面に戻った。サーバーへ通知し、
+  // 全員が戻るまでホストの「ゲームスタート」を待たせる（初回入室時にも送るが無害）。
+  useEffect(() => {
+    if (hasRoom) confirmBackToLobby()
+  }, [hasRoom, confirmBackToLobby])
 
   // ゲーム開始のブロードキャストを受けたら全員（ホストもゲストも）ゲーム画面へ
   useEffect(() => {
