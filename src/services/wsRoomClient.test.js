@@ -93,6 +93,19 @@ test('player leave updates the member list and game cancellation is forwarded', 
     })
     socket.onmessage({
       data: JSON.stringify({
+        type: 'game:player_left',
+        payload: {
+          disconnected_player_id: 'guest',
+          disconnected_nickname: 'ゲスト',
+          players: remaining,
+          current_player_id: 'host',
+          voted_count: 0,
+          total_count: 1,
+        },
+      }),
+    })
+    socket.onmessage({
+      data: JSON.stringify({
         type: 'game:cancelled',
         payload: { reason: 'player_disconnected', disconnected_player_id: 'guest' },
       }),
@@ -106,6 +119,17 @@ test('player leave updates the member list and game cancellation is forwarded', 
       },
     ])
     assert.deepEqual(gameMessages, [
+      {
+        type: 'game:player_left',
+        payload: {
+          disconnected_player_id: 'guest',
+          disconnected_nickname: 'ゲスト',
+          players: remaining,
+          current_player_id: 'host',
+          voted_count: 0,
+          total_count: 1,
+        },
+      },
       {
         type: 'game:cancelled',
         payload: { reason: 'player_disconnected', disconnected_player_id: 'guest' },

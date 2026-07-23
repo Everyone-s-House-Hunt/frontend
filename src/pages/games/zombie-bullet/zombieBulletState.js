@@ -18,6 +18,10 @@ export function createBulletGame(startPayload, receivedAt = Date.now()) {
 
 export function reduceBulletGame(state, event) {
   const { type, payload = {}, receivedAt = Date.now() } = event
+  const serverCurrentPlayer = (playerId) =>
+    playerId && state.players.some((player) => player.player_id === playerId)
+      ? playerId
+      : state.currentPlayerId
 
   switch (type) {
     case 'game:bullet_start':
@@ -30,7 +34,7 @@ export function reduceBulletGame(state, event) {
         ...state,
         correctCount: payload.correct_count ?? state.correctCount,
         targetHits: payload.target_hits ?? state.targetHits,
-        currentPlayerId: payload.current_player_id ?? state.currentPlayerId,
+        currentPlayerId: serverCurrentPlayer(payload.current_player_id),
         // backend の used は map 由来で順序不定。命中イベントの受信順を表示順にする。
         used,
         feedback: {
@@ -44,7 +48,7 @@ export function reduceBulletGame(state, event) {
     case 'game:bullet_miss':
       return {
         ...state,
-        currentPlayerId: payload.current_player_id ?? state.currentPlayerId,
+        currentPlayerId: serverCurrentPlayer(payload.current_player_id),
         feedback: {
           id: receivedAt,
           kind: payload.reason === 'duplicate' ? 'duplicate' : 'incorrect',
@@ -52,6 +56,31 @@ export function reduceBulletGame(state, event) {
           answer: payload.answer ?? '',
         },
       }
+    case 'game:player_left': {
+      const players = [...(payload.players ?? [])]
+        .sort(
+          (left, right) =>
+            (left.join_seq ?? 0) - (right.join_seq ?? 0) ||
+            left.player_id.localeCompare(right.player_id),
+        )
+        .map((player, position) => ({ ...player, position }))
+      const currentPlayerId = players.some(
+        (player) => player.player_id === payload.current_player_id,
+      )
+        ? payload.current_player_id
+        : players[0]?.player_id ?? ''
+      return {
+        ...state,
+        players,
+        currentPlayerId,
+        feedback: {
+          id: receivedAt,
+          kind: 'player_left',
+          playerId: payload.disconnected_player_id,
+          nickname: payload.disconnected_nickname || 'メンバー',
+        },
+      }
+    }
     case 'game:clear':
       return {
         ...state,
