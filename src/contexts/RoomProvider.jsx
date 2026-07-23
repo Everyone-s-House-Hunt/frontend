@@ -64,7 +64,7 @@ function derivePlayers(players) {
 export function RoomProvider({ children }) {
   const [room, setRoom] = useState(null)
   const [settings, setSettings] = useState(INITIAL_SETTINGS)
-  const [activeGame, setActiveGame] = useState(null) // { mode, startType, startPayload }
+  const [activeGame, setActiveGame] = useState(null) // { mode, startType, startPayload, startedAt }
   const [serverError, setServerError] = useState('')
   const [roomNotice, setRoomNotice] = useState('') // ルーム解散の通知（ロビーで表示）
   const connectionRef = useRef(null)
@@ -93,7 +93,11 @@ export function RoomProvider({ children }) {
         onGameMessage: (type, payload) => {
           const mode = GAME_START_TO_MODE[type]
           if (mode) {
-            setActiveGame((prev) => prev ?? { mode, startType: type, startPayload: payload })
+            const startedAt = Date.now()
+            const nextGame = { mode, startType: type, startPayload: payload, startedAt }
+            // bullet_start は1ゲームにつき1回だけなので、結果画面に残っている参加者も
+            // 再戦開始へ確実に追従させる。他ゲームのラウンド開始は既存状態を維持する。
+            setActiveGame((prev) => (type === 'game:bullet_start' ? nextGame : (prev ?? nextGame)))
           }
           gameSubscribersRef.current.forEach((cb) => cb(type, payload))
         },
@@ -173,7 +177,7 @@ export function RoomProvider({ children }) {
   // ゲーム開始（ホストのみ有効）。結果はWSのブロードキャスト（activeGame）かエラーで返る。
   const startGame = useCallback(() => {
     setServerError('')
-    getConnection().sendGameStart(BACKEND_GAME_MODE[settings.gameMode])
+    return getConnection().sendGameStart(BACKEND_GAME_MODE[settings.gameMode])
   }, [getConnection, settings.gameMode])
 
   const leaveRoom = useCallback(() => {

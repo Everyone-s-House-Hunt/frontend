@@ -3,7 +3,7 @@
 // 認証（招待トークン検証・ゲストトークン）はバックエンド未実装のためまだ付けていない。
 // 実装されたら join 時の接続URLにトークンを付与する。
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
+const WS_BASE_URL = import.meta.env?.VITE_WS_URL || 'ws://localhost:8080'
 
 export class RoomConnection {
   // handlers: { onPlayersUpdate, onDestroyed, onServerError, onGameMessage }
@@ -56,12 +56,17 @@ export class RoomConnection {
   // ゲーム中メッセージの送信にも使う汎用送信
   send(type, payload) {
     const ws = this.current?.ws
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
-    this.#send(ws, type, payload)
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
+    try {
+      this.#send(ws, type, payload)
+      return true
+    } catch {
+      return false
+    }
   }
 
   sendGameStart(gameMode) {
-    this.send('game:start', { game_mode: gameMode })
+    return this.send('game:start', { game_mode: gameMode })
   }
 
   // 自分から切断する（画面遷移や新しいルームへの入り直し時）。ハンドラへの通知はしない。
