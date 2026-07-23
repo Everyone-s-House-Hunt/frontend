@@ -3,7 +3,7 @@ export function createBulletGame(startPayload, receivedAt = Date.now()) {
     phase: 'playing',
     question: startPayload?.question ?? '',
     targetHits: startPayload?.target_hits ?? 10,
-    timeLimitMs: (startPayload?.time_limit_sec ?? 60) * 1000,
+    timeLimitMs: (startPayload?.time_limit_sec ?? 85) * 1000,
     players: [...(startPayload?.players ?? [])].sort(
       (left, right) => (left.position ?? 0) - (right.position ?? 0),
     ),

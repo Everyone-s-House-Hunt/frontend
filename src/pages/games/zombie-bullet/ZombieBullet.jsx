@@ -142,7 +142,7 @@ function ZombieBullet() {
     subscribeGame,
     sendGameMessage
   } = useRoom();
-  const initialTimeLimitMs = (activeGame?.startPayload?.time_limit_sec ?? 60) * 1000;
+  const initialTimeLimitMs = (activeGame?.startPayload?.time_limit_sec ?? 85) * 1000;
   const [initialStartedAt] = useState(() => activeGame?.startedAt ?? Date.now());
   const [game, setGame] = useState(() => createBulletGame(
       activeGame?.startPayload,
@@ -832,7 +832,7 @@ function ZombieBullet() {
       const deltaSeconds = Math.min(0.034, Math.max(0, (now - visual.lastFrameAt) / 1e3));
       visual.lastFrameAt = now;
       const gamePhase = phaseRef.current;
-      const duration = questionRef.current?.timeLimitMs || 6e4;
+      const duration = questionRef.current?.timeLimitMs || 85e3;
       const exactRemaining = gamePhase === "playing" ? Math.max(0, duration - (now - roundStartedAtRef.current)) : remainingMsRef.current;
       const approach = gamePhase === "title" ? 0.12 + Math.sin(now * 12e-4) * 0.012 : gamePhase === "countdown" ? 0.15 : gamePhase === "lose" ? 1 : gamePhase === "win" ? visual.explosionProgress : clamp(1 - exactRemaining / duration);
       const lane = visualLaneAt(visual, now);
